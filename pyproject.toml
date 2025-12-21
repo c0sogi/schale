@@ -1,0 +1,20 @@
+[build-system]
+requires = ["uv_build>=0.9.18,<0.10.0"]
+build-backend = "uv_build"
+
+[project]
+name = "schale"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["pydantic>=2.12.5", "requests>=2.32.5"]
+
+[project.optional-dependencies]
+dev = ["pyright>=1.1.407", "ruff>=0.14.10"]
+
+[tool.uv]
+package = true
+
+[tool.pyright]
+typeCheckingMode = "strict"
