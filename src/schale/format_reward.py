@@ -1,8 +1,7 @@
 from functools import cache
 
-from schale import literal
+from schale import literal, localization
 from schale.cache_control import cache_collection
-from schale import localization
 from schale.schema.equipments import Equipment
 from schale.schema.furniture import Furniture
 from schale.schema.item import Item

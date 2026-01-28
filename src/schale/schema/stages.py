@@ -2,8 +2,7 @@ from typing import Generic, Literal, Optional, TypeVar
 
 from pydantic import BaseModel, RootModel, model_validator
 
-from schale import literal
-from schale import localization
+from schale import literal, localization
 
 _EntryCost = tuple[int, int]
 _StarCondition = tuple[int, int]

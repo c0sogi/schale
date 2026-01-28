@@ -3,8 +3,8 @@ from dataclasses import dataclass, field
 from logging import getLogger
 from typing import Callable, Generic, TypeVar
 
-from schale.data_control import CACHE_TTL_SECONDS, get_json
 from schale import localization
+from schale.data_control import CACHE_TTL_SECONDS, get_json
 from schale.schema.equipments import Equipment
 from schale.schema.furniture import Furniture
 from schale.schema.group import GroupEntry
@@ -24,7 +24,7 @@ class Cache(Generic[K, V]):
     update_callback: Callable[[], dict[K, V]]
 
     _expiry: float | None = field(default=None, init=False, repr=False)
-    _cache: dict[K, V] = field(default_factory=dict, init=False, repr=False)
+    _cache: dict[K, V] = field(default_factory=dict[K, V], init=False, repr=False)
 
     @property
     def data(self) -> dict[K, V]:

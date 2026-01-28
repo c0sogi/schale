@@ -1,9 +1,8 @@
 from typing import Generic, Literal, Optional, TypeVar
+
 from pydantic import BaseModel, RootModel, model_validator
 
-from schale import literal
-from schale import localization
-
+from schale import literal, localization
 
 _BonusAmount = tuple[int, int]
 _TriBool = tuple[bool, bool, bool]

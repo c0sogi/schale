@@ -6,10 +6,9 @@ from schale.cache_control import cache_collection
 from schale.format_reward import format_reward
 from schale.schema.group import GroupEntry
 from schale.schema.stages import (
+    Reward,
     Stage,
 )
-from schale.schema.stages import Reward
-
 
 _stage_cache: dict[int, Stage] | None = None
 _group_cache: dict[int, GroupEntry] = {}

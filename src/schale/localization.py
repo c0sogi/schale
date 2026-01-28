@@ -1,7 +1,8 @@
-from typing import Literal
 import locale
 import os
 import sys
+from typing import Literal
+
 from schale import literal
 
 Lang = Literal["kr", "jp", "cn", "en"]

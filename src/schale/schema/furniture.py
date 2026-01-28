@@ -5,7 +5,6 @@ from pydantic import BaseModel, model_validator
 from schale import literal
 from schale.schema.item import ShiftingCraftRecipeData
 
-
 _TriBool = tuple[bool, bool, bool]
 _Size = tuple[int, int]
 _TemplateEntry = tuple[int, int]

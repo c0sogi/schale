@@ -1,6 +1,5 @@
 from typing import Literal
 
-
 Server = Literal["Global", "Cn", "Jp"]
 ConsumableChoiceType = Literal["Item", "Equipment", "Furniture"]
 DropType = Literal["Currency", "Equipment", "Furniture", "Item"]
@@ -39,7 +38,17 @@ EquipmentCategory = Literal[
 ]
 
 
-
+WearableCategory = Literal[
+    "Hat",
+    "Gloves",
+    "Shoes",
+    "Bag",
+    "Badge",
+    "Hairpin",
+    "Charm",
+    "Necklace",
+    "Watch",
+]
 
 ShopCategory = Literal["General", "MasterCoin", "SecretStoneGrowth"]
 ShopCostType = Literal["Currency", "Item"]
@@ -53,8 +62,6 @@ ItemCategory = Literal[
     "Consumable",
 ]
 RewardCondition = Literal["FirstClear", "ThreeStar"]
-
-
 
 
 Terrain = Literal["Indoor", "Outdoor", "Street"]
