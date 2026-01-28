@@ -284,37 +284,35 @@ class TestBondOptimizer(unittest.TestCase):
         self.assertGreaterEqual(result.stat_gain, 0)
 
     def test_create_bond_pool_with_alts(self):
-        """Test creating bond pool with FavorAlts."""
-        all_students = {
+        """Test creating bond pool with FavorAlts - new API."""
+        # Create test students dict
+        test_students = {
             10004: self.hina,
             10022: self.hina_swimsuit,
         }
 
-        initial_progress = {
-            10004: BondProgress(level=20, current_exp=0),
-            10022: BondProgress(level=15, current_exp=0),
-        }
-
         pool = create_bond_pool_with_alts(
-            base_student=self.hina,
-            all_students=all_students,
-            initial_progress=initial_progress
+            self.hina,
+            initial_levels={
+                "Hina": 20,
+                "Hina (Swimsuit)": 15,
+            },
+            _test_students=test_students
         )
 
         self.assertEqual(len(pool.students), 2)  # Hina + Swimsuit
         self.assertEqual(pool.max_level, 20)
 
     def test_create_bond_pool_no_initial_progress(self):
-        """Test creating bond pool without initial progress."""
-        all_students = {
+        """Test creating bond pool without initial progress - new API."""
+        test_students = {
             10004: self.hina,
             10022: self.hina_swimsuit,
         }
 
         pool = create_bond_pool_with_alts(
-            base_student=self.hina,
-            all_students=all_students,
-            initial_progress=None
+            self.hina,
+            _test_students=test_students
         )
 
         # Should default to level 1

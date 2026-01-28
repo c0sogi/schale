@@ -284,59 +284,81 @@ class BondPool:
 
 
 def create_bond_pool_with_alts(
-    base_student: Student,
-    all_students: dict[int, Student],
-    initial_progress: Optional[dict[int, BondProgress]] = None,
+    base_student: Student | str,
+    initial_levels: Optional[dict[str, int]] = None,
+    *,
+    _test_students: Optional[dict[int, Student]] = None,
 ) -> BondPool:
     """
     Create a bond pool including a student and all their FavorAlts.
 
+    Automatically uses cache_collection.students, no need to pass it manually.
+    Use student PathNames instead of IDs for better usability.
+
     Args:
-        base_student: Starting student
-        all_students: Dict of all available students (from cache_collection.students)
-        initial_progress: Optional dict of initial progress for each student.
-                         If None, all students start at level 1.
+        base_student: Student object or PathName string (e.g., "Hina", "Hina_Swimsuit")
+        initial_levels: Optional dict mapping PathName to bond level.
+                       Example: {"Hina": 20, "Hina_Swimsuit": 15, "Hina_Dress": 25}
+                       If None, all students start at level 1.
+                       Missing students default to level 1.
 
     Returns:
         BondPool with all students sharing stat bonuses
 
     Example:
-        >>> from schale import cache_collection, get_student_by_path_name
-        >>> from schale.bond_progress import BondProgress
-        >>> hina = get_student_by_path_name("Hina")
+        >>> # Simple usage with PathName
         >>> pool = create_bond_pool_with_alts(
-        ...     hina,
-        ...     cache_collection.students,
-        ...     initial_progress={
-        ...         10004: BondProgress(20, 0),
-        ...         10022: BondProgress(15, 0),
-        ...         10086: BondProgress(30, 0),
+        ...     "Hina",
+        ...     initial_levels={
+        ...         "Hina": 20,
+        ...         "Hina_Swimsuit": 15,
+        ...         "Hina_Dress": 25,
         ...     }
         ... )
-        >>> # Pool now includes Hina (20), Hina_Swimsuit (15), Hina_Dress (30)
-        >>> # Max level is 30, so all get level 30 stat bonuses
-    """
-    pool_students = [base_student]
+        >>> print(pool.max_level)  # 25
+        >>> # All students get level 25 stat bonuses
 
-    # Add all FavorAlts
+        >>> # Or with Student object
+        >>> from schale import get_student_by_path_name
+        >>> hina = get_student_by_path_name("Hina")
+        >>> pool = create_bond_pool_with_alts(hina, {"Hina": 20})
+    """
+    from schale.cache_control import cache_collection
+    from schale.student_utils import get_student_by_path_name
+
+    # If string, look up student
+    if isinstance(base_student, str):
+        student_obj = get_student_by_path_name(base_student)
+        if student_obj is None:
+            raise ValueError(f"Student not found: {base_student}")
+        base_student = student_obj
+
+    # Use cache_collection.students automatically (no boilerplate!)
+    # For testing, allow passing in a custom student dict
+    all_students = _test_students if _test_students is not None else cache_collection.students
+
+    # Get all pool students (base + FavorAlts)
+    pool_students = [base_student]
     if base_student.FavorAlts:
         for alt_id in base_student.FavorAlts:
             if alt_id in all_students:
                 pool_students.append(all_students[alt_id])
 
-    # Initialize progress
-    if initial_progress is None:
+    # Convert PathName-based levels to ID-based progress
+    if initial_levels is None:
         student_progress = {
             student.Id: BondProgress(level=1, current_exp=0)
             for student in pool_students
         }
     else:
-        # Use provided progress, fill missing with level 1
         student_progress = {}
         for student in pool_students:
-            if student.Id in initial_progress:
-                student_progress[student.Id] = initial_progress[student.Id]
+            # Use PathName as key (much more user-friendly!)
+            if student.PathName in initial_levels:
+                level = initial_levels[student.PathName]
+                student_progress[student.Id] = BondProgress(level=level, current_exp=0)
             else:
+                # Default to level 1 if not specified
                 student_progress[student.Id] = BondProgress(level=1, current_exp=0)
 
     return BondPool(students=pool_students, student_progress=student_progress)
