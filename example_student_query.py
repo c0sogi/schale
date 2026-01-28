@@ -1,10 +1,19 @@
 """
-학생 데이터 조회 예제
+학생 데이터 조회 예제 (타입 안전 버전)
 
 SchaleDB에서 학생 정보를 가져오고 필터링하는 다양한 방법을 보여줍니다.
+IDE 자동완성과 타입 체킹을 활용한 타입 안전한 방식을 사용합니다.
+
+참고: 최신 타입 안전 예제는 example_type_safe_queries.py를 참조하세요.
 """
 
 from schale.schema.student import Student
+from schale import (
+    get_student_by_path_name,
+    get_students_by_school,
+    get_students_by_role,
+    filter_students,
+)
 
 
 def create_example_students() -> dict[int, Student]:

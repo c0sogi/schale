@@ -62,9 +62,9 @@ class Student(BaseModel):
 
     # === Core Identity ===
     Id: int
-    DevName: str
+    DevName: literal.StudentPathName
     Name: str
-    PathName: str
+    PathName: literal.StudentPathName
 
     # === Release Status ===
     IsReleased: _TriBool  # [Global, CN, JP]
