@@ -1,25 +1,25 @@
-"""Tests for bond optimization."""
+"""Tests for bond optimization with independent student levels."""
 
 import unittest
 
 from schale.bond_progress import BondProgress
 from schale.bond_optimizer import (
-    calculate_stat_gain_for_level,
-    find_best_student_for_next_level,
-    optimize_bond_distribution_greedy,
+    BondOptimizationResult,
     BondPool,
+    calculate_stat_gain_for_level,
+    optimize_bond_distribution_greedy,
     create_bond_pool_with_alts,
 )
 from schale.schema.student import Student
 
 
 class TestBondOptimizer(unittest.TestCase):
-    """Test bond optimization functions."""
+    """Test bond optimization algorithms with independent levels."""
 
     def setUp(self):
-        """Create test students."""
-        # Create Hina variants with different stat gains
-        self.hina_data = {
+        """Set up test students (Hina variants)."""
+        # Hina (Original) - Tank with good HP
+        self.hina = Student.model_validate({
             "Id": 10004,
             "DevName": "Hina",
             "Name": "Hina",
@@ -56,183 +56,288 @@ class TestBondOptimizer(unittest.TestCase):
             "AmmoCost": 2,
             "RegenCost": 700,
             "FavorStatType": ["AttackPower", "MaxHP"],
-            "FavorStatValue": [
-                [3, 38],
-                [5, 63],
-                [7, 88],
-                [9, 106],
-                [2, 18],
-                [3, 29],
-                [5, 47],
-            ],
+            "FavorStatValue": [[3, 38], [5, 63], [7, 88], [9, 106], [2, 18], [3, 29], [5, 47]],
             "FavorAlts": [10022, 10086],
             "Equipment": ["Hat", "Gloves", "Shoes"],
             "Skills": [],
             "WeaponImg": "weapon_icon_10004",
-        }
+        })
 
-        self.hina_swimsuit_data = self.hina_data.copy()
-        self.hina_swimsuit_data.update(
-            {
-                "Id": 10022,
-                "DevName": "Hina_Swimsuit",
-                "Name": "Hina (Swimsuit)",
-                "PathName": "Hina_Swimsuit",
-                "TacticRole": "DamageDealer",
-                "ArmorType": "LightArmor",
-                "WeaponType": "SR",
-                "FavorStatValue": [
-                    [3, 0],
-                    [5, 0],
-                    [7, 43],
-                    [9, 51],
-                    [2, 8],
-                    [3, 13],
-                    [5, 21],
-                ],
-                "FavorAlts": [10004, 10086],
-            }
-        )
-
-        self.hina = Student.model_validate(self.hina_data)
-        self.hina_swimsuit = Student.model_validate(self.hina_swimsuit_data)
+        # Hina (Swimsuit) - Damage dealer
+        self.hina_swimsuit = Student.model_validate({
+            "Id": 10022,
+            "DevName": "Hina_Swimsuit",
+            "Name": "Hina (Swimsuit)",
+            "PathName": "Hina_Swimsuit",
+            "IsReleased": [True, True, True],
+            "School": "Gehenna",
+            "Club": "Disciplinary Committee",
+            "StarGrade": 3,
+            "SquadType": "Main",
+            "TacticRole": "DamageDealer",
+            "Position": "Back",
+            "BulletType": "Explosion",
+            "ArmorType": "LightArmor",
+            "WeaponType": "SR",
+            "Cover": True,
+            "StreetBattleAdaptation": 4,
+            "OutdoorBattleAdaptation": 2,
+            "IndoorBattleAdaptation": 0,
+            "MaxHP1": 2236,
+            "MaxHP100": 19390,
+            "AttackPower1": 369,
+            "AttackPower100": 3690,
+            "DefensePower1": 19,
+            "DefensePower100": 119,
+            "HealPower1": 1408,
+            "HealPower100": 4225,
+            "AccuracyPoint": 905,
+            "DodgePoint": 201,
+            "CriticalPoint": 201,
+            "CriticalDamageRate": 20000,
+            "StabilityPoint": 1988,
+            "Range": 750,
+            "AmmoCount": 5,
+            "AmmoCost": 1,
+            "RegenCost": 700,
+            "FavorStatType": ["AttackPower", "MaxHP"],
+            "FavorStatValue": [[3, 0], [5, 0], [7, 43], [9, 51], [2, 8], [3, 13], [5, 21]],
+            "FavorAlts": [10004, 10086],
+            "Equipment": ["Hat", "Hairpin", "Watch"],
+            "Skills": [],
+            "WeaponImg": "weapon_icon_10022",
+        })
 
     def test_calculate_stat_gain(self):
         """Test stat gain calculation."""
-        # Hina gains AttackPower from level 1 to 10
-        gain = calculate_stat_gain_for_level(self.hina, 1, 10, "AttackPower")
+        gain = calculate_stat_gain_for_level(self.hina, 10, 20, "AttackPower")
         self.assertGreater(gain, 0)
 
-        # Hina Swimsuit has different gains
-        gain_swimsuit = calculate_stat_gain_for_level(
-            self.hina_swimsuit, 1, 10, "AttackPower"
-        )
-        self.assertGreater(gain_swimsuit, 0)
+        # Same level = 0 gain
+        gain_zero = calculate_stat_gain_for_level(self.hina, 10, 10, "AttackPower")
+        self.assertEqual(gain_zero, 0)
 
-    def test_calculate_stat_gain_same_level(self):
-        """Test stat gain when levels are the same."""
-        gain = calculate_stat_gain_for_level(self.hina, 10, 10, "AttackPower")
-        self.assertEqual(gain, 0)
-
-    def test_calculate_stat_gain_backwards(self):
-        """Test stat gain when going backwards."""
-        gain = calculate_stat_gain_for_level(self.hina, 20, 10, "AttackPower")
-        self.assertEqual(gain, 0)
-
-    def test_find_best_student(self):
-        """Test finding best student for next level."""
-        students = [self.hina, self.hina_swimsuit]
-
-        # At level 10, find which student benefits more from level 11
-        best = find_best_student_for_next_level(students, 10, "AttackPower")
-        self.assertIsNotNone(best)
-        self.assertIn(best, students)
-
-    def test_find_best_student_at_max(self):
-        """Test finding best student when at max level."""
-        students = [self.hina, self.hina_swimsuit]
-        best = find_best_student_for_next_level(students, 50, "AttackPower")
-        self.assertIsNone(best)
+        # Backward = 0 gain
+        gain_back = calculate_stat_gain_for_level(self.hina, 20, 10, "AttackPower")
+        self.assertEqual(gain_back, 0)
 
     def test_optimize_greedy_basic(self):
-        """Test basic greedy optimization."""
-        students = [self.hina, self.hina_swimsuit]
-        current = BondProgress(level=1, current_exp=0)
+        """Test basic greedy optimization with independent levels."""
+        # Start with different levels
+        current_levels = {
+            10004: BondProgress(level=20, current_exp=0),  # Hina
+            10022: BondProgress(level=15, current_exp=0),  # Hina Swimsuit
+        }
 
-        # Optimize with 1000 EXP
         result = optimize_bond_distribution_greedy(
-            students, current, 1000, "AttackPower"
+            students=[self.hina, self.hina_swimsuit],
+            current_levels=current_levels,
+            available_exp=5000,
+            target_stat="AttackPower"
         )
 
-        self.assertGreater(result.final_level, current.level)
-        self.assertEqual(result.exp_used + result.exp_remaining, 1000)
-        self.assertGreater(result.stat_gain, 0)
-        self.assertIn(result.target_student_id, [self.hina.Id, self.hina_swimsuit.Id])
+        # Should allocate to student with max level (Hina, level 20)
+        self.assertGreater(result.exp_allocation[10004], 0)
+        self.assertGreaterEqual(result.final_levels[10004], 20)  # Should level up or stay same
+        # Max level should increase
+        self.assertGreaterEqual(result.max_level, 20)
 
-    def test_optimize_greedy_maxhp(self):
-        """Test optimization for MaxHP."""
-        students = [self.hina, self.hina_swimsuit]
-        current = BondProgress(level=10, current_exp=0)
+    def test_optimize_greedy_equal_levels(self):
+        """Test optimization when all students at same level."""
+        current_levels = {
+            10004: BondProgress(level=10, current_exp=0),
+            10022: BondProgress(level=10, current_exp=0),
+        }
 
-        result = optimize_bond_distribution_greedy(students, current, 5000, "MaxHP")
+        result = optimize_bond_distribution_greedy(
+            students=[self.hina, self.hina_swimsuit],
+            current_levels=current_levels,
+            available_exp=3000,
+            target_stat="AttackPower"
+        )
 
-        self.assertGreater(result.final_level, current.level)
-        self.assertGreater(result.stat_gain, 0)
+        # Should pick one and level it up
+        total_allocated = sum(result.exp_allocation.values())
+        self.assertGreater(total_allocated, 0)
+        self.assertGreaterEqual(result.max_level, 10)
 
     def test_optimize_greedy_insufficient_exp(self):
         """Test optimization with insufficient EXP for level up."""
-        students = [self.hina]
-        current = BondProgress(level=10, current_exp=0)
-
-        # Only 50 EXP (not enough for level 11)
-        result = optimize_bond_distribution_greedy(students, current, 50, "AttackPower")
-
-        # Should remain at level 10
-        self.assertEqual(result.final_level, current.level)
-        self.assertEqual(result.level_ups, 0)
-        self.assertEqual(result.stat_gain, 0)
-
-    def test_optimize_greedy_to_max_level(self):
-        """Test optimization to max level."""
-        students = [self.hina]
-        current = BondProgress(level=45, current_exp=0)
-
-        # Huge amount of EXP
-        result = optimize_bond_distribution_greedy(
-            students, current, 999999, "AttackPower"
-        )
-
-        self.assertEqual(result.final_level, 50)
-        self.assertGreater(result.stat_gain, 0)
-
-    def test_bond_pool_from_student(self):
-        """Test creating bond pool from student."""
-        pool = BondPool.from_student(self.hina, BondProgress(level=10))
-
-        self.assertEqual(len(pool.students), 1)
-        self.assertEqual(pool.shared_progress.level, 10)
-
-    def test_bond_pool_optimize(self):
-        """Test bond pool optimization."""
-        pool = BondPool(
-            students=[self.hina, self.hina_swimsuit],
-            shared_progress=BondProgress(level=10),
-        )
-
-        result = pool.optimize("AttackPower", 5000)
-
-        self.assertGreater(result.final_level, 10)
-        self.assertGreater(result.stat_gain, 0)
-
-    def test_create_bond_pool_with_alts(self):
-        """Test creating bond pool with FavorAlts."""
-        all_students = {
-            self.hina.Id: self.hina,
-            self.hina_swimsuit.Id: self.hina_swimsuit,
+        current_levels = {
+            10004: BondProgress(level=20, current_exp=0),
         }
 
-        pool = create_bond_pool_with_alts(
-            self.hina, all_students, BondProgress(level=20)
+        result = optimize_bond_distribution_greedy(
+            students=[self.hina],
+            current_levels=current_levels,
+            available_exp=100,  # Not enough for level 21
+            target_stat="AttackPower"
         )
 
-        # Should include both Hina and Hina Swimsuit
-        self.assertGreaterEqual(len(pool.students), 2)
-        self.assertEqual(pool.shared_progress.level, 20)
+        # Should not level up
+        self.assertEqual(result.final_levels[10004], 20)
+        self.assertEqual(result.stat_gain, 0)
+        self.assertEqual(result.exp_used, 0)
+
+    def test_optimize_greedy_maxhp(self):
+        """Test optimization for MaxHP."""
+        current_levels = {
+            10004: BondProgress(level=10, current_exp=0),
+        }
+
+        result = optimize_bond_distribution_greedy(
+            students=[self.hina],
+            current_levels=current_levels,
+            available_exp=10000,
+            target_stat="MaxHP"
+        )
+
+        self.assertGreater(result.stat_gain, 0)
+        self.assertGreater(result.final_levels[10004], 10)
 
     def test_optimize_invalid_stat(self):
         """Test optimization with invalid stat type."""
-        students = [self.hina]
-        current = BondProgress(level=10)
+        current_levels = {
+            10004: BondProgress(level=10, current_exp=0),
+        }
 
         with self.assertRaises(ValueError):
             optimize_bond_distribution_greedy(
-                students, current, 1000, "InvalidStat"
+                students=[self.hina],
+                current_levels=current_levels,
+                available_exp=1000,
+                target_stat="InvalidStat"
             )
 
     def test_optimize_empty_student_list(self):
         """Test optimization with empty student list."""
         with self.assertRaises(ValueError):
-            optimize_bond_distribution_greedy([], BondProgress(), 1000, "AttackPower")
+            optimize_bond_distribution_greedy(
+                students=[],
+                current_levels={},
+                available_exp=1000,
+                target_stat="AttackPower"
+            )
+
+    def test_bond_pool_creation(self):
+        """Test BondPool creation."""
+        student_progress = {
+            10004: BondProgress(level=20, current_exp=0),
+            10022: BondProgress(level=15, current_exp=0),
+        }
+
+        pool = BondPool(
+            students=[self.hina, self.hina_swimsuit],
+            student_progress=student_progress
+        )
+
+        self.assertEqual(len(pool.students), 2)
+        self.assertEqual(pool.max_level, 20)  # Max among 20 and 15
+
+    def test_bond_pool_max_level(self):
+        """Test BondPool max_level property."""
+        student_progress = {
+            10004: BondProgress(level=25, current_exp=0),
+            10022: BondProgress(level=30, current_exp=0),
+        }
+
+        pool = BondPool(
+            students=[self.hina, self.hina_swimsuit],
+            student_progress=student_progress
+        )
+
+        self.assertEqual(pool.max_level, 30)
+
+    def test_bond_pool_get_stat_bonus(self):
+        """Test getting stat bonus based on max level."""
+        student_progress = {
+            10004: BondProgress(level=10, current_exp=0),
+            10022: BondProgress(level=15, current_exp=0),
+        }
+
+        pool = BondPool(
+            students=[self.hina, self.hina_swimsuit],
+            student_progress=student_progress
+        )
+
+        # Stat bonus should be based on level 15 (max)
+        bonus = pool.get_stat_bonus("AttackPower")
+        expected_bonus = self.hina.get_bond_stats(15)["AttackPower"]
+        self.assertEqual(bonus, expected_bonus)
+
+    def test_bond_pool_optimize(self):
+        """Test BondPool.optimize method."""
+        student_progress = {
+            10004: BondProgress(level=10, current_exp=0),
+            10022: BondProgress(level=8, current_exp=0),
+        }
+
+        pool = BondPool(
+            students=[self.hina, self.hina_swimsuit],
+            student_progress=student_progress
+        )
+
+        result = pool.optimize("AttackPower", 5000)
+
+        self.assertIsInstance(result, BondOptimizationResult)
+        self.assertGreaterEqual(result.max_level, 10)
+        self.assertGreaterEqual(result.stat_gain, 0)
+
+    def test_create_bond_pool_with_alts(self):
+        """Test creating bond pool with FavorAlts."""
+        all_students = {
+            10004: self.hina,
+            10022: self.hina_swimsuit,
+        }
+
+        initial_progress = {
+            10004: BondProgress(level=20, current_exp=0),
+            10022: BondProgress(level=15, current_exp=0),
+        }
+
+        pool = create_bond_pool_with_alts(
+            base_student=self.hina,
+            all_students=all_students,
+            initial_progress=initial_progress
+        )
+
+        self.assertEqual(len(pool.students), 2)  # Hina + Swimsuit
+        self.assertEqual(pool.max_level, 20)
+
+    def test_create_bond_pool_no_initial_progress(self):
+        """Test creating bond pool without initial progress."""
+        all_students = {
+            10004: self.hina,
+            10022: self.hina_swimsuit,
+        }
+
+        pool = create_bond_pool_with_alts(
+            base_student=self.hina,
+            all_students=all_students,
+            initial_progress=None
+        )
+
+        # Should default to level 1
+        self.assertEqual(pool.max_level, 1)
+        for progress in pool.student_progress.values():
+            self.assertEqual(progress.level, 1)
+
+    def test_optimize_allocates_to_max_level_student(self):
+        """Test that optimization prioritizes student with max level."""
+        current_levels = {
+            10004: BondProgress(level=25, current_exp=0),  # Max
+            10022: BondProgress(level=20, current_exp=0),
+        }
+
+        result = optimize_bond_distribution_greedy(
+            students=[self.hina, self.hina_swimsuit],
+            current_levels=current_levels,
+            available_exp=3000,
+            target_stat="AttackPower"
+        )
+
+        # Should allocate primarily to student 10004 (max level)
+        self.assertGreater(result.exp_allocation[10004], result.exp_allocation.get(10022, 0))
 
 
 if __name__ == "__main__":

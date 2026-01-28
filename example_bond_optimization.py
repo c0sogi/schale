@@ -1,17 +1,17 @@
 """
-Bond EXP system and optimization examples.
+Bond EXP system and optimization examples with independent student levels.
 
 This script demonstrates:
 1. Bond progress tracking with EXP addition
 2. Bond distribution optimization across FavorAlts students
-3. Maximizing specific stats through optimal bond leveling
+3. Each student has independent bond level, but stat bonuses apply based on max level
+4. Maximizing specific stats through optimal bond leveling
 """
 
 from schale.bond_progress import BondProgress
 from schale.bond_optimizer import (
-    optimize_bond_distribution_greedy,
-    create_bond_pool_with_alts,
     BondPool,
+    create_bond_pool_with_alts,
 )
 from schale.schema.student import Student
 
@@ -107,15 +107,7 @@ def create_example_students() -> dict[int, Student]:
             "AmmoCost": 1,
             "RegenCost": 700,
             "FavorStatType": ["AttackPower", "MaxHP"],
-            "FavorStatValue": [
-                [3, 0],
-                [5, 0],
-                [7, 43],
-                [9, 51],
-                [2, 8],
-                [3, 13],
-                [5, 21],
-            ],
+            "FavorStatValue": [[3, 0], [5, 0], [7, 43], [9, 51], [2, 8], [3, 13], [5, 21]],
             "FavorAlts": [10004, 10086],
             "Equipment": ["Hat", "Hairpin", "Watch"],
             "Skills": [],
@@ -158,15 +150,7 @@ def create_example_students() -> dict[int, Student]:
             "AmmoCost": 1,
             "RegenCost": 700,
             "FavorStatType": ["AttackPower", "MaxHP"],
-            "FavorStatValue": [
-                [3, 0],
-                [5, 0],
-                [7, 43],
-                [9, 51],
-                [2, 8],
-                [3, 13],
-                [5, 21],
-            ],
+            "FavorStatValue": [[3, 0], [5, 0], [7, 43], [9, 51], [2, 8], [3, 13], [5, 21]],
             "FavorAlts": [10004, 10022],
             "Equipment": ["Hat", "Hairpin", "Watch"],
             "Skills": [],
@@ -178,13 +162,13 @@ def create_example_students() -> dict[int, Student]:
 
 
 def main():
-    """Demonstrate bond EXP system and optimization."""
+    """Demonstrate bond EXP system and optimization with independent levels."""
     print("=" * 70)
     print("Bond EXP System and Optimization Examples")
     print("=" * 70)
 
     # ========================================================================
-    # Part 1: Bond Progress Tracking
+    # Part 1: Bond Progress Tracking (unchanged)
     # ========================================================================
     print("\n[Part 1] Bond Progress Tracking with EXP Addition")
     print("-" * 70)
@@ -205,103 +189,136 @@ def main():
     print(f"\nTotal accumulated EXP: {progress.total_exp}")
     print(f"EXP needed for next level: {progress.exp_to_next_level}")
 
-    # Create from total EXP
-    progress2 = BondProgress.from_total_exp(10000)
-    print(f"\nCreated from 10000 total EXP: {progress2}")
-
     # ========================================================================
-    # Part 2: Bond Optimization for Single Student
+    # Part 2: FavorAlts System - Independent Levels
     # ========================================================================
-    print("\n\n[Part 2] Bond Optimization - Single Student")
+    print("\n\n[Part 2] FavorAlts System - Independent Bond Levels")
     print("-" * 70)
 
     students = create_example_students()
     hina = students[10004]
-
-    # Current state: Level 20
-    current = BondProgress(level=20, current_exp=0)
-    available_exp = 15000
-
-    print(f"Student: {hina.Name}")
-    print(f"Current bond: Level {current.level}")
-    print(f"Available EXP: {available_exp:,}")
-    print(f"\nFavorStatType: {', '.join(hina.FavorStatType)}")
-
-    # Optimize for AttackPower
-    result = optimize_bond_distribution_greedy(
-        [hina], current, available_exp, "AttackPower"
-    )
-
-    print(f"\nOptimization Result (AttackPower):")
-    print(f"  Final level: {result.final_level}")
-    print(f"  Level ups: {result.level_ups}")
-    print(f"  AttackPower gain: +{result.stat_gain}")
-    print(f"  EXP used: {result.exp_used:,}")
-    print(f"  EXP remaining: {result.exp_remaining:,}")
-
-    # ========================================================================
-    # Part 3: Bond Pool Optimization (FavorAlts)
-    # ========================================================================
-    print("\n\n[Part 3] Bond Pool Optimization - FavorAlts Students")
-    print("-" * 70)
-
-    # All Hina variants share bond levels
-    hina = students[10004]
     hina_swimsuit = students[10022]
     hina_dress = students[10086]
 
-    all_hina = [hina, hina_swimsuit, hina_dress]
+    print("Key Concept:")
+    print("  - Each student has INDEPENDENT bond level")
+    print("  - Stat bonuses apply based on MAXIMUM level among FavorAlts")
+    print("  - Example: Hina(20), Hina_Swimsuit(15), Hina_Dress(30)")
+    print("    → All three get level 30 stat bonuses!")
 
-    print("Students in bond pool:")
-    for student in all_hina:
-        print(f"  - {student.Name} ({student.TacticRole})")
+    # ========================================================================
+    # Part 3: Bond Pool Optimization - Independent Levels
+    # ========================================================================
+    print("\n\n[Part 3] Bond Pool Optimization - Independent Levels")
+    print("-" * 70)
 
-    # Create bond pool
-    pool = create_bond_pool_with_alts(hina, students, BondProgress(level=10))
+    # Create initial state with different levels
+    initial_progress = {
+        10004: BondProgress(level=20, current_exp=0),  # Hina
+        10022: BondProgress(level=15, current_exp=0),  # Hina (Swimsuit)
+        10086: BondProgress(level=25, current_exp=0),  # Hina (Dress)
+    }
 
-    print(f"\nBond pool size: {len(pool.students)} students")
-    print(f"Shared bond level: {pool.shared_progress.level}")
+    all_students_dict = {s.Id: s for s in [hina, hina_swimsuit, hina_dress]}
+    pool = create_bond_pool_with_alts(
+        hina, all_students_dict, initial_progress=initial_progress
+    )
+
+    print("Initial State:")
+    print(f"  {'Student':<22} {'Level':>7} {'Current Stat Bonus':>20}")
+    print("  " + "-" * 50)
+    for student in [hina, hina_swimsuit, hina_dress]:
+        level = initial_progress[student.Id].level
+        print(f"  {student.Name:<22} {level:>7}    (see below)")
+
+    print(f"\n  Current MAX level: {pool.max_level}")
+    print(f"  → All students get level {pool.max_level} stat bonuses:")
+    print(f"     AttackPower: +{pool.get_stat_bonus('AttackPower')}")
+    print(f"     MaxHP: +{pool.get_stat_bonus('MaxHP')}")
 
     # Optimize for AttackPower
-    print("\n--- Optimizing for AttackPower ---")
+    print("\n--- Optimizing for AttackPower with 10,000 EXP ---")
     result_atk = pool.optimize("AttackPower", 10000)
 
-    print(f"Best student: ID {result_atk.target_student_id}")
-    best_student_atk = students[result_atk.target_student_id]
-    print(f"  Name: {best_student_atk.Name}")
-    print(f"  Final level: {result_atk.final_level}")
+    print(f"\nOptimization Result:")
+    print(f"  New MAX level: {result_atk.max_level} (was {pool.max_level})")
     print(f"  AttackPower gain: +{result_atk.stat_gain}")
+    print(f"  EXP used: {result_atk.exp_used:,} / {10000:,}")
+    print(f"  EXP remaining: {result_atk.exp_remaining:,}")
+
+    print(f"\n  EXP Allocation:")
+    for student_id, allocated_exp in result_atk.exp_allocation.items():
+        student_name = all_students_dict[student_id].Name
+        final_level = result_atk.final_levels[student_id]
+        initial_level = initial_progress[student_id].level
+        print(
+            f"    {student_name:<22} Level {initial_level:>2} → {final_level:>2}  "
+            f"({allocated_exp:>5} EXP)"
+        )
 
     # Optimize for MaxHP
-    print("\n--- Optimizing for MaxHP ---")
+    print("\n--- Optimizing for MaxHP with 10,000 EXP ---")
     result_hp = pool.optimize("MaxHP", 10000)
 
-    print(f"Best student: ID {result_hp.target_student_id}")
-    best_student_hp = students[result_hp.target_student_id]
-    print(f"  Name: {best_student_hp.Name}")
-    print(f"  Final level: {result_hp.final_level}")
+    print(f"\nOptimization Result:")
+    print(f"  New MAX level: {result_hp.max_level} (was {pool.max_level})")
     print(f"  MaxHP gain: +{result_hp.stat_gain}")
+    print(f"  EXP used: {result_hp.exp_used:,} / {10000:,}")
+    print(f"  EXP remaining: {result_hp.exp_remaining:,}")
+
+    print(f"\n  EXP Allocation:")
+    for student_id, allocated_exp in result_hp.exp_allocation.items():
+        student_name = all_students_dict[student_id].Name
+        final_level = result_hp.final_levels[student_id]
+        initial_level = initial_progress[student_id].level
+        print(
+            f"    {student_name:<22} Level {initial_level:>2} → {final_level:>2}  "
+            f"({allocated_exp:>5} EXP)"
+        )
 
     # ========================================================================
-    # Part 4: Comparing Student Bond Gains
+    # Part 4: Different Starting Scenarios
     # ========================================================================
-    print("\n\n[Part 4] Comparing Bond Stat Gains Across Students")
+    print("\n\n[Part 4] Scenario Analysis - When to Level Each Student")
     print("-" * 70)
 
-    print(f"{'Student':<20} {'From Level':>12} {'To Level':>10} {'Atk Gain':>10} {'HP Gain':>10}")
-    print("-" * 70)
+    # Scenario 1: All at same level
+    print("\nScenario 1: All students at level 10")
+    pool1 = create_bond_pool_with_alts(
+        hina,
+        all_students_dict,
+        initial_progress={
+            10004: BondProgress(10, 0),
+            10022: BondProgress(10, 0),
+            10086: BondProgress(10, 0),
+        },
+    )
+    result1 = pool1.optimize("AttackPower", 5000)
+    print(f"  Strategy: Level up one student to increase max level")
+    print(f"  Result: Max level {pool1.max_level} → {result1.max_level}")
+    print(f"  Allocation: ", end="")
+    for sid, exp in result1.exp_allocation.items():
+        if exp > 0:
+            print(f"{all_students_dict[sid].Name} gets {exp} EXP")
 
-    from_level = 20
-    to_level = 30
-
-    for student in all_hina:
-        atk_stats_from = student.get_bond_stats(from_level)
-        atk_stats_to = student.get_bond_stats(to_level)
-
-        atk_gain = atk_stats_to["AttackPower"] - atk_stats_from["AttackPower"]
-        hp_gain = atk_stats_to["MaxHP"] - atk_stats_from["MaxHP"]
-
-        print(f"{student.Name:<20} {from_level:>12} {to_level:>10} {'+'+str(atk_gain):>10} {'+'+str(hp_gain):>10}")
+    # Scenario 2: One already high
+    print("\nScenario 2: One student already at level 30, others at 10")
+    pool2 = create_bond_pool_with_alts(
+        hina,
+        all_students_dict,
+        initial_progress={
+            10004: BondProgress(30, 0),
+            10022: BondProgress(10, 0),
+            10086: BondProgress(10, 0),
+        },
+    )
+    result2 = pool2.optimize("AttackPower", 5000)
+    print(f"  Strategy: Continue leveling the highest to push max level further")
+    print(f"  Result: Max level {pool2.max_level} → {result2.max_level}")
+    print(f"  Allocation: ", end="")
+    for sid, exp in result2.exp_allocation.items():
+        if exp > 0:
+            print(f"{all_students_dict[sid].Name} gets {exp} EXP")
 
     # ========================================================================
     # Summary
@@ -309,24 +326,28 @@ def main():
     print("\n" + "=" * 70)
     print("Summary")
     print("=" * 70)
-    print("""
+    print(
+        """
 Key Features:
 
-1. **BondProgress Class**:
-   - Immutable bond tracking (level + EXP)
-   - Support for + and - operators
-   - Automatic level calculation from total EXP
+1. **Independent Bond Levels**:
+   - Each student has their own bond level
+   - Hina: Level 20, Hina(Swimsuit): Level 15, Hina(Dress): Level 25
 
-2. **EXP Addition**:
-   progress = BondProgress(level=10, current_exp=100)
-   new_progress = progress + 5000  # Add 5000 EXP
+2. **Shared Stat Bonuses**:
+   - All FavorAlts get stat bonuses based on MAXIMUM level
+   - In above example, all three get level 25 bonuses
 
-3. **Bond Pool Optimization**:
-   - Find which student benefits most from bond leveling
-   - Maximize specific stats (AttackPower, MaxHP, etc.)
-   - Works with FavorAlts students sharing bond
+3. **Independent EXP Distribution**:
+   - Can freely allocate EXP to each student
+   - Example: Give 60 EXP to Hina, 30 to Swimsuit, 10 to Dress
 
-4. **Usage with Real Data**:
+4. **Optimization Strategy**:
+   - Greedy algorithm: Always level up the student with max level
+   - This ensures the stat bonus level increases as quickly as possible
+   - Efficient use of limited bond items
+
+5. **Usage with Real Data**:
    from schale import cache_collection, get_student_by_path_name
    from schale.bond_optimizer import create_bond_pool_with_alts
    from schale.bond_progress import BondProgress
@@ -335,9 +356,17 @@ Key Features:
    pool = create_bond_pool_with_alts(
        hina,
        cache_collection.students,
-       BondProgress(level=20)
+       initial_progress={
+           10004: BondProgress(level=20, current_exp=0),
+           10022: BondProgress(level=15, current_exp=0),
+           10086: BondProgress(level=25, current_exp=0),
+       }
    )
    result = pool.optimize("AttackPower", 10000)
+
+   # See how to allocate EXP
+   for student_id, exp in result.exp_allocation.items():
+       print(f"Give {exp} EXP to student {student_id}")
 """
     )
 
