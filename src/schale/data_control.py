@@ -167,3 +167,55 @@ def get_json(
         return seed_payload
 
     raise RuntimeError(f"Cannot load cache for {url}")
+
+
+def get_json_list(
+    url: str, *, force_refresh: bool = False, ttl_seconds: Optional[int] = None
+) -> list[dict[str, object]]:
+    """
+    Fetch JSON array with packaged seeds + on-disk caching.
+
+    Similar to get_json but for JSON arrays instead of objects.
+    Used for endpoints that return arrays (e.g., students.min.json).
+    """
+    filename = _url_to_filename(url)
+    cache_path = _cache_file_path(filename)
+    logger.debug("Cache path: %s", cache_path)
+    ttl = CACHE_TTL_SECONDS if ttl_seconds is None else max(0, ttl_seconds)
+    effective_force_refresh = force_refresh or _FORCE_REFRESH_REQUESTED
+
+    if effective_force_refresh or _needs_disk_refresh(cache_path, ttl):
+        _download_and_store(url, cache_path)
+
+    # Read as list instead of dict
+    if not cache_path.exists():
+        payload = None
+    else:
+        try:
+            with cache_path.open("r", encoding="utf-8") as handle:
+                loaded = json.load(handle)
+                if isinstance(loaded, list):
+                    payload = [dict(item) if isinstance(item, dict) else item for item in loaded]
+                else:
+                    logger.warning("Cache file %s is not a list", cache_path)
+                    payload = None
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.warning("Failed to read cache file %s: %s", cache_path, exc)
+            payload = None
+
+    if payload is not None:
+        return payload
+
+    # Try seed payload
+    local_seed = _PACKAGE_CACHE_DIR / filename
+    if local_seed.exists():
+        try:
+            with local_seed.open("r", encoding="utf-8") as handle:
+                loaded = json.load(handle)
+                if isinstance(loaded, list):
+                    _copy_seed_to_cache(filename)
+                    return [dict(item) if isinstance(item, dict) else item for item in loaded]
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    raise RuntimeError(f"Cannot load cache for {url}")

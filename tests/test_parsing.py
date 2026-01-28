@@ -22,6 +22,10 @@ class TestParsing(unittest.TestCase):
     def test_furniture(self):
         cc.cache_collection.furnitures
 
+    def test_students(self):
+        students = cc.cache_collection.students
+        self.assertGreater(len(students), 0, "Should have at least one student")
+
     def test_refresh_all(self):
         cc.force_refresh = True
         cc.cache_collection.refresh_all()

@@ -68,3 +68,47 @@ StageCategory = Literal["Campaign", "Bounty", "WeekDungeon", "SchoolDungeon"]
 BountyStageType = Literal["ChaserA", "ChaserB", "ChaserC"]
 WeekDungeonStageType = Literal["FindGift", "Blood"]
 SchoolDungeonStageType = Literal["SchoolA", "SchoolB", "SchoolC"]
+
+
+# Student-related types
+StatType = Literal[
+    "AttackPower",
+    "MaxHP",
+    "DefensePower",
+    "HealPower",
+    "AccuracyPoint",
+    "DodgePoint",
+    "CriticalPoint",
+    "CriticalDamageRate",
+    "StabilityPoint",
+    "Range",
+    "AmmoCount",
+    "AmmoCost",
+    "RegenCost",
+]
+
+ArmorType = Literal["LightArmor", "HeavyArmor", "Unarmed", "ElasticArmor"]
+BulletType = Literal["Explosion", "Pierce", "Mystic", "Sonic"]
+WeaponType = Literal["SG", "SMG", "AR", "GL", "HG", "RL", "SR", "RG", "MG", "MT", "FT"]
+School = Literal[
+    "Abydos",
+    "Arius",
+    "ETC",
+    "Gehenna",
+    "Hyakkiyako",
+    "Millennium",
+    "RedWinter",
+    "Shanhaijing",
+    "SRT",
+    "Trinity",
+    "Valkyrie",
+]
+SquadType = Literal["Main", "Support"]
+TacticRole = Literal[
+    "DamageDealer",
+    "Tanker",
+    "Healer",
+    "Support",
+    "Vehicle",
+]
+Position = Literal["Front", "Middle", "Back"]
