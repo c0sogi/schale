@@ -3,13 +3,14 @@ from dataclasses import dataclass, field
 from logging import getLogger
 from typing import Callable, Generic, TypeVar
 
-from schale.data_control import CACHE_TTL_SECONDS, get_json
+from schale.data_control import CACHE_TTL_SECONDS, get_json, get_json_list
 from schale import localization
 from schale.schema.equipments import Equipment
 from schale.schema.furniture import Furniture
 from schale.schema.group import GroupEntry
 from schale.schema.item import Item
 from schale.schema.stages import Stage
+from schale.schema.student import Student
 
 logger = getLogger(__name__)
 
@@ -91,6 +92,14 @@ class CacheCollection:
             ).items()
         }
     )
+    _students: Cache[int, Student] = Cache(
+        update_callback=lambda: {
+            student_data["Id"]: Student.model_validate(student_data)
+            for student_data in get_json_list(
+                localization.STUDENTS_URL, force_refresh=force_refresh
+            )
+        }
+    )
 
     @property
     def groups(self) -> dict[int, GroupEntry]:
@@ -112,12 +121,17 @@ class CacheCollection:
     def furnitures(self) -> dict[int, Furniture]:
         return self._furnitures.data
 
+    @property
+    def students(self) -> dict[int, Student]:
+        return self._students.data
+
     def refresh_all(self) -> None:
         self._groups.refresh()
         self._stages.refresh()
         self._items.refresh()
         self._equipments.refresh()
         self._furnitures.refresh()
+        self._students.refresh()
 
 
 cache_collection = CacheCollection()

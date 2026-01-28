@@ -322,3 +322,4 @@ EQUIPMENT_METADATA_URL = f"https://schaledb.com/data/{USER_LANG}/equipment.min.j
 FURNITURE_METADATA_URL = f"https://schaledb.com/data/{USER_LANG}/furniture.min.json"
 GROUPS_URL = "https://schaledb.com/data/groups.min.json"
 STAGES_URL = f"https://schaledb.com/data/{USER_LANG}/stages.min.json"
+STUDENTS_URL = f"https://schaledb.com/data/{USER_LANG}/students.min.json"
