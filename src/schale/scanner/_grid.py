@@ -27,7 +27,7 @@ class CellRegion:
 
     def extract_roi(self, image: NDArray[np.uint8]) -> NDArray[np.uint8]:
         """Extract the cell's region of interest from the source image."""
-        return image[self.y : self.y + self.height, self.x : self.x + self.width]  # type: ignore[return-value]
+        return image[self.y : self.y + self.height, self.x : self.x + self.width]
 
 
 def _cluster_rows(

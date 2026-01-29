@@ -5,7 +5,7 @@ import shutil
 import time
 from importlib import resources
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Optional
 
 import requests
 
@@ -77,8 +77,7 @@ def _read_json_from_path(path: Path) -> Optional[dict[str, object]]:
         logger.warning("Failed to read cache file %s: %s", path, exc)
         return None
     if isinstance(loaded, dict):
-        typed_loaded: dict[Any, object] = cast(dict[Any, object], loaded)
-        return {str(k): v for k, v in typed_loaded.items()}
+        return {str(k): v for k, v in loaded.items()}
     logger.warning("Cache file %s is not a dict", path)
     return None
 

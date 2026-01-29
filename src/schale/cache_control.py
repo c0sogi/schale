@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import time
 from dataclasses import dataclass, field
 from logging import getLogger
@@ -24,7 +26,7 @@ class Cache(Generic[K, V]):
     update_callback: Callable[[], dict[K, V]]
 
     _expiry: float | None = field(default=None, init=False, repr=False)
-    _cache: dict[K, V] = field(default_factory=dict[K, V], init=False, repr=False)
+    _cache: dict[K, V] = field(default_factory=dict, init=False, repr=False)
 
     @property
     def data(self) -> dict[K, V]:

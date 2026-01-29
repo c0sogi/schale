@@ -5,11 +5,14 @@ from __future__ import annotations
 import logging
 import re
 import threading
-from typing import Any, ClassVar, cast
+from typing import TYPE_CHECKING, ClassVar, cast
 
 import cv2
 import numpy as np
 from numpy.typing import NDArray
+
+if TYPE_CHECKING:
+    import easyocr
 
 logger = logging.getLogger(__name__)
 
@@ -19,16 +22,16 @@ _TIER_PATTERN = re.compile(r"[Tt](\d{1,2})")
 class _OCRReaderHolder:
     """Lazy singleton for the EasyOCR reader to avoid slow re-initialization."""
 
-    _reader: ClassVar[object | None] = None
+    _reader: ClassVar[easyocr.Reader | None] = None
     _lock: ClassVar[threading.Lock] = threading.Lock()
 
     @classmethod
-    def get(cls) -> object:
+    def get(cls) -> easyocr.Reader:
         """Return the shared EasyOCR Reader instance, creating it on first call."""
         if cls._reader is None:
             with cls._lock:
                 if cls._reader is None:
-                    import easyocr  # type: ignore[import-untyped]
+                    import easyocr  # pyright: ignore[reportMissingTypeStubs]
 
                     cls._reader = easyocr.Reader(["en"], gpu=False)
         return cls._reader
@@ -49,9 +52,10 @@ def _run_ocr(
     """
     reader = _OCRReaderHolder.get()
     # easyocr.Reader.readtext returns list of (bbox, text, confidence)
+    # where bbox is list[list[int]], text is str, confidence is float
     raw_results = cast(
-        list[list[Any]],
-        reader.readtext(  # type: ignore[union-attr]
+        list[tuple[list[list[int]], str, float]],
+        reader.readtext(
             image,
             allowlist=allowlist,
             paragraph=False,
@@ -94,7 +98,7 @@ def detect_exp_sphere_tier(cell_roi: NDArray[np.uint8]) -> int | None:
     # Require sufficient saturation and value to avoid white/gray/black regions
     lower_sat_val = np.array([0, 60, 60], dtype=np.uint8)
     upper_sat_val = np.array([180, 255, 255], dtype=np.uint8)
-    sat_mask: NDArray[np.uint8] = cv2.inRange(hsv, lower_sat_val, upper_sat_val)  # type: ignore[assignment]
+    sat_mask = cv2.inRange(hsv, lower_sat_val, upper_sat_val)
 
     # Require significant saturated pixels for Exp sphere detection
     # Exp spheres have very uniform, saturated colors (40% minimum)
@@ -102,7 +106,11 @@ def detect_exp_sphere_tier(cell_roi: NDArray[np.uint8]) -> int | None:
     saturated_pixels = cv2.countNonZero(sat_mask)
     sat_percent = 100 * saturated_pixels / sat_mask.size
     if saturated_pixels < 0.40 * sat_mask.size:
-        logger.debug("Color detection: insufficient saturated pixels (%d, %.1f%%)", saturated_pixels, sat_percent)
+        logger.debug(
+            "Color detection: insufficient saturated pixels (%d, %.1f%%)",
+            saturated_pixels,
+            sat_percent,
+        )
         return None
 
     # Analyze hue histogram for dominant color
@@ -127,9 +135,12 @@ def detect_exp_sphere_tier(cell_roi: NDArray[np.uint8]) -> int | None:
 
     logger.debug(
         "Color detection: purple=%d (%.1f%%), blue=%d (%.1f%%), yellow=%d (%.1f%%), sat_px=%d",
-        purple_count, 100 * purple_count / saturated_pixels if saturated_pixels > 0 else 0,
-        blue_count, 100 * blue_count / saturated_pixels if saturated_pixels > 0 else 0,
-        yellow_orange_count, 100 * yellow_orange_count / saturated_pixels if saturated_pixels > 0 else 0,
+        purple_count,
+        100 * purple_count / saturated_pixels if saturated_pixels > 0 else 0,
+        blue_count,
+        100 * blue_count / saturated_pixels if saturated_pixels > 0 else 0,
+        yellow_orange_count,
+        100 * yellow_orange_count / saturated_pixels if saturated_pixels > 0 else 0,
         saturated_pixels,
     )
 
@@ -160,20 +171,25 @@ def detect_exp_sphere_tier(cell_roi: NDArray[np.uint8]) -> int | None:
     return None
 
 
-def read_tier_badge(cell_roi: NDArray[np.uint8]) -> int | None:
+def read_tier_badge(
+    cell_roi: NDArray[np.uint8], is_blueprint: bool = False
+) -> int | None:
     """Read the tier badge (T2-T10) from the lower-left corner of a cell.
 
     The tier badge is white text on a blue rounded rectangle
     located in the bottom-left area of each equipment card.
 
     If no tier badge is found, falls back to color-based detection
-    for Exp spheres which don't have text badges.
+    for Exp spheres which don't have text badges. However, this fallback
+    is skipped for blueprint cells to avoid false positives from blueprint
+    backgrounds.
 
     Args:
         cell_roi: BGR cell region of interest.
+        is_blueprint: Whether this is a blueprint cell (skip Exp detection).
 
     Returns:
-        Tier number (1-10) or None if no valid badge is found.
+        Tier number (0-10) or None if no valid badge is found.
     """
     h, w = cell_roi.shape[:2]
 
@@ -186,7 +202,7 @@ def read_tier_badge(cell_roi: NDArray[np.uint8]) -> int | None:
     hsv = cv2.cvtColor(badge_roi, cv2.COLOR_BGR2HSV)
     lower_blue = np.array([95, 80, 80], dtype=np.uint8)
     upper_blue = np.array([135, 255, 255], dtype=np.uint8)
-    blue_mask: NDArray[np.uint8] = cv2.inRange(hsv, lower_blue, upper_blue)  # type: ignore[assignment]
+    blue_mask = cv2.inRange(hsv, lower_blue, upper_blue)
 
     # If not enough blue pixels, no badge present
     if cv2.countNonZero(blue_mask) < 0.15 * blue_mask.size:
@@ -195,23 +211,25 @@ def read_tier_badge(cell_roi: NDArray[np.uint8]) -> int | None:
         # Don't return here - let OCR attempts proceed first
         tier_from_ocr = None
     else:
-
         # Extract the blue badge region from the original BGR image
-        badge_region_bgr: NDArray[np.uint8] = cv2.bitwise_and(badge_roi, badge_roi, mask=blue_mask)  # type: ignore[assignment]
+        badge_region_bgr = cv2.bitwise_and(badge_roi, badge_roi, mask=blue_mask)
 
-        # Convert to grayscale and threshold for white text (bright pixels)
+        # Convert to grayscale and use adaptive threshold for white text
         gray_badge = cv2.cvtColor(badge_region_bgr, cv2.COLOR_BGR2GRAY)
-        _, text_only = cv2.threshold(gray_badge, 200, 255, cv2.THRESH_BINARY)
+        text_only = cv2.adaptiveThreshold(
+            gray_badge, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY, 11, 2
+        )
 
         # Dilate to connect broken text before upscaling
         dilate_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
-        text_only = cv2.dilate(text_only, dilate_kernel, iterations=1)  # type: ignore[assignment]
+        text_only = cv2.dilate(text_only, dilate_kernel, iterations=1)
 
         # Upscale for better OCR accuracy
-        # Upscale more aggressively - aim for at least 120px width
-        scale = max(2, 120 // max(text_only.shape[1], 1))
+        # Upscale more aggressively - aim for at least 200px width
+        scale = max(3, 200 // max(text_only.shape[1], 1))
         if scale > 1:
-            text_only = cv2.resize(  # type: ignore[assignment]
+            text_only = cv2.resize(
                 text_only,
                 (text_only.shape[1] * scale, text_only.shape[0] * scale),
                 interpolation=cv2.INTER_NEAREST,
@@ -227,7 +245,9 @@ def read_tier_badge(cell_roi: NDArray[np.uint8]) -> int | None:
 
         # Handle common OCR misreads
         raw = "".join(texts).upper().strip()
-        raw = raw.replace("Z", "2").replace("O", "0").replace("I", "1").replace("S", "5")
+        raw = (
+            raw.replace("Z", "2").replace("O", "0").replace("I", "1").replace("S", "5")
+        )
         match = _TIER_PATTERN.search(raw)
         if match:
             tier = int(match.group(1))
@@ -239,9 +259,9 @@ def read_tier_badge(cell_roi: NDArray[np.uint8]) -> int | None:
 
     # If badge detection and OCR both failed, try Exp sphere color detection as fallback
     # This catches Exp spheres which have no tier badge at all
-    if tier_from_ocr is None:
-        return None  # Temporarily disabled for testing
-        # return detect_exp_sphere_tier(cell_roi)
+    # SKIP for blueprint cells to avoid false positives from blueprint backgrounds
+    if tier_from_ocr is None and not is_blueprint:
+        return detect_exp_sphere_tier(cell_roi)
 
     return tier_from_ocr
 
@@ -303,7 +323,7 @@ def read_quantity(cell_roi: NDArray[np.uint8]) -> int | None:
     min_width = 80
     if gray_qty.shape[1] < min_width:
         scale = min_width // max(gray_qty.shape[1], 1) + 1
-        gray_qty = cv2.resize(  # type: ignore[assignment]
+        gray_qty = cv2.resize(
             gray_qty,
             (gray_qty.shape[1] * scale, gray_qty.shape[0] * scale),
             interpolation=cv2.INTER_CUBIC,

@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Union
+from typing import Union, cast
 
 try:
     import cv2
@@ -32,12 +32,15 @@ except ImportError as exc:
         "Install them with: uv add schale[scanner]"
     ) from exc
 
+from schale import literal
 from schale.scanner._grid import CellRegion, detect_grid
 from schale.scanner._icons import IconAtlas
 from schale.scanner._ocr import read_quantity, read_tier_badge
 from schale.scanner._preprocessing import (
+    compute_blue_ratio,
     detect_blueprint_background,
     load_image,
+    preprocess_blueprint_cell,
 )
 from schale.schema.scanner import ScannedItem, ScanResult
 
@@ -77,11 +80,33 @@ def _process_cell(
     """
     cell_roi = cell.extract_roi(image)
 
+    # Ensure exact template size for matching (normalization may have small variance)
+    TARGET_H, TARGET_W = 116, 146
+    if cell_roi.shape[:2] != (TARGET_H, TARGET_W):
+        cell_roi = cv2.resize(
+            cell_roi,
+            (TARGET_W, TARGET_H),  # Note: cv2.resize takes (width, height)
+            interpolation=cv2.INTER_AREA,
+        )
+
     # Classify cell type (blueprint vs regular)
     is_blueprint = detect_blueprint_background(cell_roi)
 
-    # Read tier badge
-    tier = read_tier_badge(cell_roi)
+    # Apply gentle CLAHE preprocessing for blueprint cells
+    # (using simplified approach - 4-stage pipeline was too aggressive)
+    if is_blueprint:
+        blue_ratio = compute_blue_ratio(cell_roi)
+        if blue_ratio > 0.24:
+            logger.debug(
+                "Cell (%d, %d) has high blue ratio (%.3f), applying gentle CLAHE preprocessing",
+                cell.row,
+                cell.col,
+                blue_ratio,
+            )
+            cell_roi = preprocess_blueprint_cell(cell_roi)
+
+    # Read tier badge (pass is_blueprint to avoid false Exp detection on blueprints)
+    tier = read_tier_badge(cell_roi, is_blueprint=is_blueprint)
 
     # Read quantity
     quantity = read_quantity(cell_roi)
@@ -93,28 +118,44 @@ def _process_cell(
             cell.col,
         )
 
-    # Match full cell ROI using masked sliding-window template matching
-    best_match, confidence = atlas.match(
-        cell_roi,
-        filter_blueprint=is_blueprint,
-        filter_tier=tier,
-    )
+    # Use CNN classifier to predict icon (category + tier)
+    # CNN is trained on clean icons, so it works better than template/feature matching
+    # which struggle with tier badges and quantity text overlays
+    if atlas._cnn is not None:
+        predictions = atlas._cnn.predict(cell_roi, top_k=1)
+        if predictions:
+            pred_name, cnn_confidence = predictions[0]
 
-    # Do NOT fall back to unfiltered search
-    # If tier filtering fails, the item is unrecognized
-    # This prevents cross-tier false positives (e.g., hat_tier4_piece
-    # matching when OCR reads tier 3)
-    if best_match is None or confidence < confidence_threshold:
+            # Look up the predicted template directly
+            best_match = atlas._templates.get(pred_name)
+
+            if best_match is not None:
+                logger.info(
+                    "CNN match: %s (conf=%.3f)",
+                    pred_name,
+                    cnn_confidence,
+                )
+            else:
+                logger.warning(
+                    "CNN predicted %s but not found in templates",
+                    pred_name,
+                )
+                return None
+        else:
+            logger.warning("CNN returned no predictions")
+            return None
+    else:
+        logger.error("CNN classifier not enabled")
         return None
 
     return ScannedItem(
         equipment_id=best_match.equipment_id,
-        category=best_match.category,  # type: ignore[arg-type]
+        category=cast("literal.EquipmentCategory", best_match.category),
         tier=best_match.tier,
         quantity=quantity,
         is_blueprint=best_match.is_blueprint,
         icon_name=best_match.icon_name,
-        confidence=round(confidence, 4),
+        confidence=round(cnn_confidence, 4),
         grid_position=(cell.row, cell.col),
     )
 
@@ -122,10 +163,14 @@ def _process_cell(
 def scan_inventory(
     image: ImageSource,
     *,
-    confidence_threshold: float = 0.55,
+    confidence_threshold: float = 0.15,
     force_icon_download: bool = False,
 ) -> ScanResult:
     """Scan a Blue Archive inventory screenshot and identify equipment items.
+
+    Uses multi-tier matching strategy:
+    1. Template matching with alpha masks (primary, background-invariant)
+    2. KAZE feature matching (final fallback)
 
     Args:
         image: Path to screenshot file, or numpy array (BGR format).
@@ -140,6 +185,7 @@ def scan_inventory(
         FileNotFoundError: If image path does not exist.
         ValueError: If image cannot be decoded.
         RuntimeError: If grid detection fails entirely.
+        ImportError: If CNN model or dependencies are not available.
     """
     # Load image
     img = load_image(image)
@@ -185,7 +231,10 @@ def scan_inventory(
     if needs_scaling:
         new_width = int(original_w * scale_w)
         new_height = int(original_h * scale_h)
-        img = cv2.resize(img, (new_width, new_height), interpolation=cv2.INTER_CUBIC)  # type: ignore[assignment]
+        img = cast(
+            NDArray[np.uint8],
+            cv2.resize(img, (new_width, new_height), interpolation=cv2.INTER_CUBIC),
+        )
         logger.info(
             "Normalized image from %dx%d to %dx%d (anisotropic scale: w=%.3f h=%.3f)",
             original_w,
@@ -214,8 +263,10 @@ def scan_inventory(
         logger.info("Image already at optimal scale, skipping normalization")
         cells = cells_pass1
 
-    # Prepare icon atlas
+    # Prepare icon atlas and enable CNN classifier
     atlas = _get_atlas(force_download=force_icon_download)
+    atlas.enable_cnn()
+    logger.info("CNN classifier enabled")
 
     # Ensure we have cells after potential re-detection
     if not cells:
@@ -226,7 +277,7 @@ def scan_inventory(
     unrecognized: list[tuple[int, int]] = []
 
     for cell in cells:
-        result = _process_cell(cell, img, atlas, confidence_threshold)  # type: ignore[arg-type]
+        result = _process_cell(cell, img, atlas, confidence_threshold)
         if result is not None:
             items.append(result)
         else:

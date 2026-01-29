@@ -9,5 +9,22 @@ wheels/
 # Virtual environments
 .venv
 
+# OMC plugin
 .omc/
 NUL
+
+# Development/debug files
+/test_*.py
+/export_model.py
+debug_*/
+/tier_*.png
+checkpoints/
+training.log
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Test cache
+.pytest_cache/

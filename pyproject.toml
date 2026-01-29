@@ -5,21 +5,59 @@ build-backend = "uv_build"
 [project]
 name = "schale"
 version = "0.1.0"
-description = "Add your description here"
+description = "Blue Archive data parser and inventory scanner"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["pydantic>=2.12.5", "requests>=2.32.5"]
+dependencies = ["pydantic>=2.12.5", "requests>=2.32.5", "typer>=0.15.3"]
+
+[project.scripts]
+schale = "schale.cli:app"
 
 [project.optional-dependencies]
 scanner = [
     "opencv-python>=4.10.0",
     "easyocr>=1.7.2",
     "numpy>=1.26.0",
+    "onnxruntime>=1.23.2",
 ]
-dev = ["pyright>=1.1.407", "ruff>=0.14.10"]
+
+[dependency-groups]
+dev = [
+    # Development tools
+    "pyright>=1.1.408",
+    "ruff>=0.14.10",
+    "pytest>=9.0.2",
+    # Scanner dependencies (for development/testing)
+    "schale[scanner]",
+    # Training dependencies (heavy, dev-only)
+    "torch>=2.10.0",
+    "torchvision>=0.25.0",
+    "albumentations>=2.0.8",
+    "tqdm>=4.67.1",
+    "onnxscript>=0.5.7",
+]
 
 [tool.uv]
 package = true
+# Note: uv build backend automatically includes all files in src/ layout
 
 [tool.pyright]
-typeCheckingMode = "strict"
+typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cuda"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", marker = "sys_platform == 'darwin'" },
+    { index = "pytorch-cuda", marker = "sys_platform != 'darwin'" },
+]
