@@ -34,8 +34,13 @@ def students_extract(
         ),
     ],
     output: Annotated[
-        Path, typer.Option("--output", "-o", help="New output directory")
-    ],
+        Path | None,
+        typer.Option(
+            "--output",
+            "-o",
+            help="Optional output directory; defaults beside input. Existing contents are preserved.",
+        ),
+    ] = None,
     asset_cache: Annotated[
         Path | None, typer.Option(help="Reusable SchaleDB image cache")
     ] = None,
@@ -51,8 +56,33 @@ def students_extract(
 ) -> None:
     """Extract screenshots and fields; open review.html to inspect uncertain values."""
     try:
+        from schale.students.output import select_output
+        from schale.setup import ensure_student_runtime
+        from schale.setup import run_with_vision_if_needed
+
+        output = select_output(source, output, resume)
+        ensure_student_runtime(source, reader=reader, numeric_model=numeric_model)
+        arguments = [
+            "students",
+            "extract",
+            *map(str, source),
+            "--output",
+            str(output),
+            "--reader",
+            reader,
+        ]
+        if resume:
+            arguments.append("--resume")
+        if asset_cache is not None:
+            arguments.extend(["--asset-cache", str(asset_cache)])
+        if numeric_model is not None:
+            arguments.extend(["--numeric-model", str(numeric_model)])
+        child_status = run_with_vision_if_needed(arguments)
+        if child_status is not None:
+            raise typer.Exit(child_status)
         from schale.students.extract import extract
 
+        typer.echo(f"Output: {output}")
         result = extract(
             source[0] if len(source) == 1 else source,
             output,
@@ -108,8 +138,12 @@ def students_inspect(
 @students_app.command("install-model")
 def students_install_model(
     source: Annotated[
-        Path, typer.Argument(exists=True, help="Model bundle directory or ZIP")
-    ],
+        Path | None,
+        typer.Argument(
+            exists=True,
+            help="Optional model bundle; omitted: use the local setup bundle",
+        ),
+    ] = None,
     destination: Annotated[
         Path | None, typer.Option(help="Defaults to SCHALE_CACHE_DIR/student-numeric")
     ] = None,
@@ -120,6 +154,20 @@ def students_install_model(
 
     destination = destination or cache_directory() / "student-numeric"
     try:
+        if source is None:
+            from schale.setup import prepare_local_setup
+
+            if destination != cache_directory() / "student-numeric":
+                raise ValueError("A custom destination requires a model source")
+            if not prepare_local_setup():
+                raise ValueError(
+                    "No schale-setup.zip found. Copy the private setup file from a prepared PC to Downloads; extraction installs it automatically. Create that file on the prepared PC with: schale setup --export schale-setup.zip"
+                )
+            from schale.students.model_bundle import validate_bundle
+
+            validate_bundle(destination)
+            typer.echo(f"Ready: {destination.resolve()}")
+            return
         install_bundle(source, destination)
     except (ValueError, OSError) as error:
         typer.echo(f"Model installation failed: {error}", err=True)
@@ -141,6 +189,45 @@ def students_doctor(
     typer.echo(json.dumps(report, ensure_ascii=False, indent=2))
     if not report["ready"]:
         raise typer.Exit(1)
+
+
+@app.command("setup")
+def setup_command(
+    source: Annotated[
+        Path | None,
+        typer.Argument(
+            exists=True, dir_okay=False, help="Optional private schale-setup.zip"
+        ),
+    ] = None,
+    export: Annotated[
+        Path | None,
+        typer.Option(
+            "--export",
+            help="Export this PC's model and references into one private setup file",
+        ),
+    ] = None,
+) -> None:
+    """Transfer vision setup once. Extract automatically installs a setup ZIP in Downloads."""
+    from schale.setup import export_setup, install_setup, prepare_local_setup
+
+    try:
+        if source is not None and export is not None:
+            raise ValueError("Choose installation or export, not both")
+        if export is not None:
+            export_setup(export)
+            typer.echo(f"Private setup file: {export.resolve()} (do not publish)")
+        elif source is not None:
+            install_setup(source)
+            typer.echo("Vision resources and numeric model are ready")
+        elif prepare_local_setup():
+            typer.echo("Vision resources and numeric model are ready")
+        else:
+            raise ValueError(
+                "No local setup found. This installation has no private game references. Use a schale-setup.zip from your prepared PC; do not search for a public game-reference download."
+            )
+    except (ValueError, OSError) as error:
+        typer.echo(f"Setup failed: {error}", err=True)
+        raise typer.Exit(1) from error
 
 
 @students_app.command("export")

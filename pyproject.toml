@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "schale"
-version = "0.1.0"
+version = "0.1.1"
 description = "SchaleDB-compatible Blue Archive automation toolkit: data, collections, rewards, and vision"
 readme = "README.md"
 license = "MIT"

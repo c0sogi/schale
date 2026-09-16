@@ -109,6 +109,7 @@ def test_same_basename_images_do_not_overwrite(tmp_path):
 
 def test_cli_multiple_images_reaches_public_extractor(tmp_path, monkeypatch):
     import schale.students.extract as module
+    import schale.setup as setup
     from schale.students.models import Extraction
 
     paths = [tmp_path / "a.png", tmp_path / "b.png"]
@@ -126,6 +127,7 @@ def test_cli_multiple_images_reaches_public_extractor(tmp_path, monkeypatch):
         )
 
     monkeypatch.setattr(module, "extract", extract)
+    monkeypatch.setattr(setup, "ensure_student_runtime", lambda *args, **kwargs: None)
     result = CliRunner().invoke(
         app,
         ["students", "extract", *map(str, paths), "--output", str(tmp_path / "out")],

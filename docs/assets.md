@@ -8,8 +8,31 @@ Schale의 Git 소스·PyPI wheel·sdist에는 게임 이미지, UI 참조, 특�
 
 ## 설치와 점검
 
+0.1.1에서는 준비된 PC의 모델·참조를 개인용 준비 파일 하나로 옮길 수 있습니다.
+
 ```powershell
-uv tool install "schale[student-ocr,scanner]==0.1.0"
+# 준비된 PC에서 한 번:
+schale setup --export schale-setup.zip
+# 새 PC의 Downloads에 이 파일을 복사한 뒤:
+schale students extract recording.mp4
+```
+
+추출 명령은 현재 폴더, 입력 파일의 부모 폴더, 사용자 Downloads 순으로
+`schale-setup.zip`을 찾아 설치하고 같은 실행에서 추출을 계속합니다.
+`SCHALE_SETUP_BUNDLE`로 준비 파일을 직접 지정할 수도 있습니다. 파일이 없으면
+문자 모델·참조·영상 도구의 누락을 한 번에 표시하고 결과 폴더는 만들지 않습니다.
+Python 비전 런타임이 없으면 uv의 별도 실행 환경을 자동 사용합니다.
+FFmpeg/FFprobe 자체를 자동 설치하지는 않습니다.
+
+개인 준비 파일에는 계정 정보·영상·추출 결과·HTTP 캐시가 포함되지 않습니다.
+기존 유효한 모델·참조는 보존하며 손상된 문자 모델은 백업 후 복구합니다.
+SHA-256은 무결성 검사용이므로 신뢰하는 준비 파일만 사용하세요.
+설치된 자원이 유효하면 준비 파일을 다시 읽지 않습니다.
+
+각 자원을 별도로 관리할 때만 다음 명령을 사용합니다.
+
+```powershell
+uv tool install "schale[student-ocr,scanner]"
 schale assets install my-vision-resources.zip
 schale assets info
 schale students install-model schale-student-numeric-v1.zip

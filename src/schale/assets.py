@@ -132,9 +132,9 @@ def pack_resources(source: Path, output: Path) -> None:
             archive.write(source / name, name)
 
 
-def install_resources(source: Path) -> Path:
+def install_resources(source: Path, *, root: Path | None = None) -> Path:
     """Install immutable content-addressed resources and atomically select them."""
-    root = resource_directory()
+    root = root or resource_directory()
     root.mkdir(parents=True, exist_ok=True)
     with (
         FileLock(str(root / "install.lock")),

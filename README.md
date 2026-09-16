@@ -33,23 +33,20 @@ Python 3.12 이상이 필요합니다.
 
 ```powershell
 # CLI: 데이터·계정·보상 도구
-uv tool install "schale==0.1.0"
+uv tool install schale
 # Python 프로젝트에 추가할 때
-uv add "schale==0.1.0"
+uv add schale
 ```
 
-학생 비전도 사용하려면 위 CLI 설치 대신 다음으로 설치합니다. 기본 설치가 이미 있다면 `uv tool install --reinstall`로 extras를 추가하세요.
+학생 비전은 입력 경로만 지정합니다. 결과 폴더는 입력 옆에 자동 생성하고, 기존 결과가 있으면 번호를 붙입니다. `-o .`처럼 내용이 있는 폴더를 지정해도 그 안에 새 결과 폴더를 만들어 기존 파일을 보존합니다.
 
 ```powershell
-uv tool install "schale[student-ocr,scanner]==0.1.0"
-schale assets install ".\my-vision-resources.zip"
-schale students install-model ".\schale-student-numeric-v1.zip"
-schale students doctor
+schale students extract "recording.mp4"
 ```
 
-영상 처리에는 별도 설치한 `ffmpeg`와 `ffprobe`가 PATH에 있어야 합니다. 학생 인식은 `student-ocr`, 인벤토리는 `scanner`, 템플릿 전용은 `vision` extra입니다. 학생·인벤토리 문자 인식은 같은 ONNX 엔진과 별도 설치한 문자 모델을 공유합니다.
+최초 실행에서 Python 비전 의존성이 없으면 uv의 격리 실행 환경을 자동 준비합니다. 사용자의 Python 프로젝트 환경은 변경하지 않습니다. 영상 처리에는 `ffmpeg`와 `ffprobe`가 PATH에 있어야 합니다. 학생 인식은 `student-ocr`, 인벤토리는 `scanner`, 템플릿 전용은 `vision` extra입니다.
 
-**PyPI 패키지는 코드만 제공합니다.** 게임 이미지·UI 참조·장비 모델은 포함하지 않으며 자동으로 내려받지 않습니다. 비전 기능에는 사용자가 별도로 준비한 신뢰할 수 있는 로컬 참조 번들과 문자 모델이 필요합니다. 현재 공개 배포하는 게임 참조 번들은 없습니다. 자원 준비 전에도 데이터·계정·보상 기능은 사용할 수 있습니다. [로컬 비전 자원 구성](docs/assets.md)을 확인하세요.
+**PyPI 패키지는 코드만 제공합니다.** 게임 참조는 공개 다운로드로 제공하지 않습니다. 새 PC에서는 기존 PC에서 만든 개인용 `schale-setup.zip`을 Downloads에 한 번 복사하면, 위 추출 명령이 문자 모델과 참조를 함께 설치하고 계속 실행합니다. 별도의 `install-model` 명령은 필요 없습니다. 준비된 PC에서 `schale setup --export schale-setup.zip`으로 만들며 계정 데이터·영상·HTTP 캐시는 포함하지 않습니다. 자원이 전혀 없는 새 사용자에게 공개 모델만 받아 완전 자동 인식을 제공하는 버전은 아닙니다. [자원 구성과 준비](docs/assets.md)를 참고하세요.
 
 모든 실행용 extras와 기본 개발·테스트 환경은 Torch/EasyOCR를 설치하지 않습니다. 학습·CNN 비교 실험만 `uv run --group training ...`으로 선택하며 CPU Torch를 사용합니다.
 
