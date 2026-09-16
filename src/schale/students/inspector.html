@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>학생 인식 · 알고리즘 감독</title>
+<style>
+:root{color-scheme:dark;--bg:#0d141e;--panel:#172332;--text:#e4edf7;--muted:#a3b6ca;--cyan:#68d8ff;--green:#81eba0;--orange:#ffca70;--red:#ff7b86;--purple:#c4a0ff}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.55 system-ui,'Malgun Gothic',sans-serif}header{padding:16px 22px;border-bottom:1px solid #31465b}h1{font-size:21px;margin:0 0 5px}h2{font-size:16px;margin:6px 0 10px}p{margin:8px 0}.muted,small{color:var(--muted)}button,select,input{font:inherit;color:inherit;background:#223449;border:1px solid #476078;border-radius:5px;padding:5px 8px}button{cursor:pointer}button:hover,button.active{background:#356080}button:disabled{opacity:.4;cursor:default}a{color:var(--cyan)}.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 18px}.toolbar label{white-space:nowrap}#seek{flex:1;min-width:200px}.layout{display:grid;grid-template-columns:minmax(680px,1fr) 380px;gap:14px;padding:0 18px 20px}.panel{background:var(--panel);border:1px solid #304456;border-radius:8px;padding:12px;min-width:0}.stage{position:relative;width:100%;aspect-ratio:16/9;background:#080c12}.stage canvas{width:100%;height:100%;display:block;cursor:crosshair}#timeline{width:100%;height:120px;display:block;cursor:pointer}.layers{display:flex;flex-wrap:wrap;gap:8px 16px;margin:10px 0}.legend{font-size:12px}.fields{max-height:420px;overflow:auto}table{border-collapse:collapse;width:100%;font-size:12px}th,td{text-align:left;padding:5px;border-bottom:1px solid #304456}tr[data-field]{cursor:pointer}tr.active{background:#29465f}code,pre{font:12px/1.6 ui-monospace,Consolas,monospace}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#0d1824;padding:8px;border-radius:5px}#detail{margin-top:14px}.crops{display:flex;gap:14px;flex-wrap:wrap}.crop-card{flex:1;min-width:140px;max-width:360px}.crop-card canvas{max-width:100%;height:auto;background:#090e16;border:1px solid #486175;image-rendering:pixelated}.chips{display:flex;gap:6px;flex-wrap:wrap}.chips button{font-size:12px}.metric{color:var(--cyan)}details{margin-top:10px}summary{cursor:pointer;color:#afc8de}#notice{color:var(--orange);min-height:20px}#frameTitle{font-weight:600;margin:4px 0 8px}#selectionText{min-height:48px}#identity{overflow-wrap:anywhere}#search{width:150px}.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.active-chip{outline:2px solid var(--cyan)}@media(max-width:1100px){.layout{grid-template-columns:1fr}.fields{max-height:240px}}@media(max-width:720px){.layout{padding:0 6px}.two{grid-template-columns:1fr}.toolbar{padding:8px}}
+</style>
+<header><h1>학생 인식 · 알고리즘 감독</h1><div id="summary" class="muted"></div></header>
+<div class="toolbar">
+<button id="prev" title="왼쪽 방향키">◀</button><button id="play">재생</button><button id="next" title="오른쪽 방향키">▶</button>
+<select id="mode"><option value="selected">선택 프레임</option><option value="all">전체 분석 프레임 · 30fps</option><option value="issues">미확인·충돌 포함</option></select>
+<input id="seek" type="range" min="0" value="0"><span id="time"></span>
+<input id="search" placeholder="학생 이름 / ID"><select id="student"><option value="">학생 바로가기</option></select>
+</div>
+<div class="layout"><main>
+<section class="panel"><canvas id="timeline" width="1440" height="160"></canvas>
+<div class="legend">시간축 클릭 = 해당 시점의 분석 프레임. 회색 선: 전환량 · 빨강 선: 전환 임계값 · 초록 선: 안정 임계값 · 파랑 점: 선택 · 빨강 띠: 제외 구간</div>
+<p id="selectionText"></p></section>
+<section class="panel" style="margin-top:12px">
+<div class="toolbar" style="padding:0"><select id="view"><option value="source">원본 좌표</option><option value="normalized">정렬 기준 좌표</option></select><a id="sourceLink" target="_blank">원본 PNG 열기</a><span id="frameTitle"></span></div>
+<div class="layers">
+<label><input type="checkbox" id="fieldsLayer" checked> 필드 기준 ROI</label><label><input type="checkbox" id="anchorsLayer" checked> 정합 특징점</label><label><input type="checkbox" id="identityLayer"> 식별·화면검사 영역</label><label><input type="checkbox" id="motionLayer"> 전환 감지 영역</label><label><input type="checkbox" id="labelsLayer" checked> 값 표시</label><label><input type="checkbox" id="baselineLayer"> 보정 전 ROI</label>
+</div><div class="stage"><canvas id="screen" width="1920" height="1080"></canvas></div>
+<p class="legend"><span style="color:var(--green)">■ 숫자 관측</span> · <span style="color:var(--orange)">■ 상태 기반 추론</span> · <span style="color:var(--red)">■ 미확인/충돌</span> · <span style="color:var(--purple)">■ 식별 영역</span> · <span style="color:var(--cyan)">● 정합 inlier</span> · 색은 정답률이 아닙니다.<br>얇은 사각형: 필드 기준 위치. 흰 점선: 선택 필드의 실제 판독 근거(잠긴 슬롯 등은 숫자 위치와 다릅니다).</p>
+<div id="notice"></div>
+</section>
+<section class="panel" id="detail"><h2 id="detailTitle">필드를 클릭하세요</h2><div id="detailText"></div><div class="crops" id="crops"></div><div id="evidence"></div><h2>같은 학생의 다른 관측</h2><div id="peers" class="chips"></div></section>
+</main><aside>
+<section class="panel"><h2>프레임 판독 → 학생별 최종 결과</h2><div class="fields"><table><thead><tr><th>필드</th><th>현재</th><th>최종</th><th>현재 상태</th></tr></thead><tbody id="fieldRows"></tbody></table></div><small>confirmed는 서로 다른 프레임의 일치입니다. 단일 프레임의 observed / inferred와 구별합니다.</small></section>
+<section class="panel" style="margin-top:12px"><h2>UI 위치·스케일</h2><div id="geometry"></div><details><summary>정합 검사 기준 / 좌표계</summary><p>SIFT → Lowe ratio &lt; 0.72 → 좌·우 독립 RANSAC. inlier ≥ 12, 비율 ≥ 0.45, 기준점 범위 좌측 ≥ 80×20 / 우측 ≥ 180×180, scale 0.7–1.3, |회전| ≤ 3°, RMS ≤ 1.5px, |dx| ≤ 230 / |dy| ≤ 130, 주요 ROI 화면 안쪽.</p><p>행렬과 RMS의 단위는 1280×720입니다. 정렬 후 판독 기준은 2560×1440입니다. 화면의 얇은 ROI는 정확한 변환 사각형, 선택 필드의 굵은 ROI는 저장된 근거의 축정렬 경계입니다.</p></details></section>
+<section class="panel" style="margin-top:12px"><h2>학생 식별</h2><div id="identity"></div></section>
+<section class="panel" style="margin-top:12px"><h2>기록과 재계산의 구분</h2><p>값·원문·점수·변환은 <b>당시 저장 기록</b>입니다. 전환량·SIFT inlier·전처리 이미지는 원본으로 <b>재계산</b>했습니다. 숫자·학생 인식은 재실행하지 않았습니다.</p><p>초상화 식별의 대응점, 탈락한 SIFT 매치, 상태 판정의 중간 마스크는 당시 기록이 없어 표시하지 않습니다.</p><details><summary>검증 / 재현 정보</summary><pre id="provenance"></pre><a href="verification.json">검증 JSON</a> · <a href="data.json">전체 감독 데이터</a></details><p><a href="README.md">사용 안내</a></p></section>
+</aside></div>
+<script src="data.js"></script>
+<script>
+'use strict';
+const D=window.REPORT,$=id=>document.getElementById(id),N=D.motion.length;
+const IS_IMAGES=D.plan.input_kind==='images';
+const selected=new Map(D.frames.map(r=>[r.sample_index,r]));
+const names={bond:'인연',level:'레벨',star:'성급',ex:'EX',basic:'기본',passive:'강화',sub:'서브',weapon_star:'전무 성급',weapon_level:'전무 레벨',equipment1:'장비1 티어',equipment2:'장비2 티어',equipment3:'장비3 티어',equipment1_level:'장비1 레벨',equipment2_level:'장비2 레벨',equipment3_level:'장비3 레벨',gear:'애용품',potential_hp:'능력: 체력',potential_attack:'능력: 공격',potential_heal:'능력: 치유'};
+const order=['level','bond','star','ex','basic','passive','sub','weapon_star','weapon_level','equipment1','equipment1_level','equipment2','equipment2_level','equipment3','equipment3_level','gear','potential_hp','potential_attack','potential_heal'];
+let index=D.frames[0]?.sample_index||0,field='level',timer=null,renderToken=0,loaded=null,hitRegions=[];
+const colors={unknown:'#ff7b86',conflict:'#ff7b86',inferred:'#ffca70',observed:'#81eba0',confirmed:'#81eba0'};
+const esc=v=>String(v??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const val=v=>v===null||v===undefined?'미확인':String(v),fmt=n=>Number(n).toFixed(3);
+function list(){if($('mode').value==='all')return Array.from({length:N},(_,i)=>i);return D.frames.filter(r=>$('mode').value!=='issues'||Object.values(r.observation.fields).some(v=>v.value===null||v.status==='conflict')).map(r=>r.sample_index)}
+function step(dir){const xs=list();const target=dir>0?xs.find(x=>x>index):xs.slice().reverse().find(x=>x<index);if(target===undefined){stop();return}go(target)}
+function stop(){if(timer)clearTimeout(timer);timer=null;$('play').textContent='재생'}
+function tick(){step(1);if(timer!==null)timer=setTimeout(tick,$('mode').value==='all'?100:500)}
+function go(i){index=Math.max(0,Math.min(N-1,Math.round(i)));$('seek').value=index;render()}
+function rect(box){const[x,y,x1,y1]=box;return [[x,y],[x1,y],[x1,y1],[x,y1]]}
+function path(ctx,points){ctx.beginPath();points.forEach((p,i)=>ctx[i?'lineTo':'moveTo'](p[0]*1920,p[1]*1080));ctx.closePath()}
+function overlay(ctx,points,color,label='',dash=false,width=2){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.setLineDash(dash?[8,6]:[]);path(ctx,points);ctx.stroke();ctx.setLineDash([]);if(label){const x=points[0][0]*1920,y=Math.max(19,points[0][1]*1080-5);ctx.font='17px system-ui';const w=ctx.measureText(label).width;ctx.fillStyle='#0c1521e6';ctx.fillRect(x,y-18,w+8,23);ctx.fillStyle=color;ctx.fillText(label,x+4,y)}}
+function draw(){const c=$('screen'),ctx=c.getContext('2d');ctx.clearRect(0,0,1920,1080);if(!loaded)return;ctx.drawImage(loaded,0,0,1920,1080);const r=selected.get(index),canonical=$('view').value==='normalized'&&r?.normalized_url;hitRegions=[];
+if($('motionLayer').checked&&!canonical)D.motion_boxes.forEach((b,i)=>overlay(ctx,rect(b),'#e0d996',`motion ${i+1}`,true));
+if(!r)return;
+for(const region of r.regions){const reading=r.observation.fields[region.name],isField=region.kind==='field';if(isField&&!$('fieldsLayer').checked||!isField&&!$('identityLayer').checked)continue;
+const points=canonical?rect(region.box):region.polygon,color=isField?(colors[reading?.status]||'#ff7b86'):'#c4a0ff';
+if(isField&&$('baselineLayer').checked&&!canonical)overlay(ctx,rect(region.box),'#d0d7de','',true,1);
+const text=$('labelsLayer').checked?(isField?`${names[region.name]||region.name} ${val(reading?.value)}`:region.name):'';
+overlay(ctx,points,color,text,false,region.name===field?4:2);if(isField)hitRegions.push({field:region.name,points});}
+if(!canonical&&r.observation.fields[field])for(const e of r.observation.fields[field].evidence)overlay(ctx,rect(e.roi),'#ffffff','근거 ROI',true,3);
+if($('anchorsLayer').checked)for(const info of Object.values(r.anchors)){const points=canonical?info.reference_points:info.source_points;ctx.fillStyle='#68d8ff';for(const p of points){ctx.beginPath();ctx.arc(p[0]*1.5,p[1]*1.5,2.8,0,7);ctx.fill()}}
+}
+function timeline(){if(IS_IMAGES){const c=$('timeline'),ctx=c.getContext('2d'),w=c.width,h=c.height;ctx.clearRect(0,0,w,h);ctx.fillStyle='#0b1521';ctx.fillRect(0,0,w,h);for(let i=0;i<N;i++){const x=i/Math.max(1,N-1)*(w-20)+10;ctx.fillStyle=i===index?'#fff':'#68aaff';ctx.fillRect(x-2,20,4,h-40);if(N<30)ctx.fillText('#'+(i+1),x,h-5)}return}const c=$('timeline'),ctx=c.getContext('2d'),w=c.width,h=c.height;ctx.clearRect(0,0,w,h);ctx.fillStyle='#0b1521';ctx.fillRect(0,0,w,h);const max=Math.max(D.plan.threshold*3,...D.motion),x=i=>i/(N-1)*w,y=v=>h-26-v/max*(h-44);
+for(const s of D.plan.discarded){ctx.fillStyle='#a12d4866';ctx.fillRect(s.start*D.plan.fps/(N-1)*w,0,(s.end-s.start)*D.plan.fps/(N-1)*w,h)}
+ctx.strokeStyle='#8194a8';ctx.lineWidth=1;ctx.beginPath();D.motion.forEach((v,i)=>ctx[i?'lineTo':'moveTo'](x(i),y(v)));ctx.stroke();
+for(const[v,color]of[[D.plan.threshold,'#ff7b86'],[D.plan.threshold*.35,'#81eba0']]){ctx.strokeStyle=color;ctx.beginPath();ctx.moveTo(0,y(v));ctx.lineTo(w,y(v));ctx.stroke();ctx.fillStyle=color;ctx.font='12px system-ui';ctx.fillText(v.toFixed(3),5,y(v)-3)}
+ctx.fillStyle='#68aaff';for(const r of D.frames)ctx.fillRect(x(r.sample_index),h-18,2,6);ctx.strokeStyle='#fff';ctx.beginPath();ctx.moveTo(x(index),0);ctx.lineTo(x(index),h);ctx.stroke();ctx.fillStyle='#d7e6f5';for(let t=0;t<D.plan.video.duration;t+=5)ctx.fillText(t+'s',x(t*D.plan.fps)+3,h-2);
+}
+function selectionText(){if(IS_IMAGES){const r=selected.get(index);$('selectionText').textContent=`이미지 ${index+1}/${N} · ${r?.input_name||'메모리 입력'} · ${r?.timestamp_known?fmt(r.timestamp)+'s (제공된 시각)':'촬영 시각 미제공'} · 중복 픽셀 제외 후 입력 순서 유지`;return}const t=index/D.plan.fps,r=selected.get(index),discard=D.plan.discarded.find(s=>s.start<=t&&t<s.end),s=D.plan.segments.find(s=>s.start<=t&&t<s.end);let reason;
+if(r)reason=`선택: ${r.segment} · 구간 ${fmt(r.start)}–${fmt(r.end)}s · 안정 후보의 20/50/80% 위치에서 중복을 제거해 최대 3장`;
+else if(discard)reason=`구간 제외: ${discard.reason}`;
+else if(s){const left=Math.round(s.start*D.plan.fps),right=Math.round(s.end*D.plan.fps),stable=index>left&&index<right-1&&D.motion[index]<D.plan.threshold*.35&&D.motion[index+1]<D.plan.threshold*.35;reason=stable?'안정 후보이지만 대표 20/50/80% 위치에 들지 않아 선택되지 않음':'전환 경계 또는 연속 두 샘플 안정 조건 미달';}
+else reason='분석 구간 밖';
+$('selectionText').textContent=`${reason}. 변화량 ${fmt(D.motion[index])} / 전환 > ${fmt(D.plan.threshold)} / 안정 < ${fmt(D.plan.threshold*.35)}.`;
+}
+function table(r){const final=r&&D.final[r.final_key];$('fieldRows').innerHTML=r?order.filter(k=>r.observation.fields[k]).map(k=>{const v=r.observation.fields[k],f=final?.fields[k];return `<tr data-field="${k}" class="${k===field?'active':''}"><td>${names[k]}</td><td style="color:${colors[v.status]||'#fff'}">${val(v.value)}</td><td>${val(f?.value)}<br><small>${esc(f?.status)}</small></td><td>${esc(v.status)}</td></tr>`}).join(''):'<tr><td colspan="4">미선택 프레임: 인식을 실행하지 않았습니다.</td></tr>';
+for(const row of $('fieldRows').querySelectorAll('[data-field]'))row.onclick=()=>{field=row.dataset.field;render()};}
+function geometry(r){$('geometry').innerHTML=r&&Object.keys(r.layouts).length?Object.entries(r.layouts).map(([side,v])=>`<p><b>${side==='left'?'좌측':'우측'}</b> · scale <span class="metric">${v.scale.toFixed(5)}</span><br>이동 (${v.matrix[0][2].toFixed(2)}, ${v.matrix[1][2].toFixed(2)})px · 회전 ${v.rotation_deg.toFixed(3)}°<br>inlier ${v.inliers}/${v.matches} · RMS ${v.rms_px_at_720p.toFixed(3)}px<br><small>재계산 대응점에서 저장/재계산 변환 차이: ${r.anchors[side]?r.anchors[side].saved_transform_max_delta_px.toFixed(6)+'px':'재계산 불가'}</small></p>`).join(''):'저장된 정합 결과 없음';}
+function identity(r){$('identity').innerHTML=r?`<b>${esc(r.observation.name)}</b> · ${esc(r.observation.student_id)}<p>${esc(r.observation.name_evidence[0]?.method)} · ${esc(r.observation.identity_status)}</p><table><tr><th>후보</th><th>스킬 점수</th><th>초상화 inlier</th></tr>${r.observation.candidates.map(c=>`<tr><td>${esc(c.name)}</td><td>${Number(c.score).toFixed(4)}</td><td>${esc(c.portrait_inliers)}</td></tr>`).join('')}</table><small>점수는 후보 간 비교용이며 정답 확률이 아닙니다.</small>`:'미선택 프레임';}
+function load(url){return new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=()=>reject(new Error('이미지를 열 수 없습니다: '+url));im.src=url})}
+async function cropCard(title,url,box,token,normalized=false){const div=document.createElement('div');div.className='crop-card';const label=document.createElement('p');label.textContent=title;const c=document.createElement('canvas');div.append(label,c);$('crops').append(div);try{const im=await load(url);if(token!==renderToken)return;const b=normalized?[Math.round(box[0]*im.naturalWidth),Math.round(box[1]*im.naturalHeight),Math.round(box[2]*im.naturalWidth)-Math.round(box[0]*im.naturalWidth),Math.round(box[3]*im.naturalHeight)-Math.round(box[1]*im.naturalHeight)]:box;c.width=Math.max(1,b[2])*3;c.height=Math.max(1,b[3])*3;const ctx=c.getContext('2d');ctx.imageSmoothingEnabled=false;ctx.drawImage(im,...b,0,0,c.width,c.height)}catch(e){if(token===renderToken)label.textContent=e.message}}
+function details(r,token){$('crops').replaceChildren();$('evidence').replaceChildren();$('peers').replaceChildren();const reading=r?.observation.fields[field];$('detailTitle').textContent=reading?`${names[field]||field} · ${field}`:'선택 프레임에서 필드를 클릭하세요';$('detailText').textContent='';if(!reading)return;
+const final=D.final[r.final_key]?.fields[field];$('detailText').textContent=`현재 프레임 ${val(reading.value)} (${reading.status}) → 학생별 최종 ${val(final?.value)} (${final?.status||'없음'}). 점수는 판독기별 척도이며 확률이 아닙니다.`;
+reading.evidence.forEach((e,i)=>{cropCard(`원본 근거 ${i+1} · 무손실 PNG`,r.source_url,e.roi,token,true);const pre=document.createElement('pre');pre.textContent=`${e.method} | score=${e.score.toFixed(4)}\n${e.raw}\nsource ROI=${e.roi.map(v=>v.toFixed(5)).join(', ')}`;$('evidence').append(pre)});
+for(const[k,b]of Object.entries(r.views[field]||{}))cropCard(({registered:'정렬된 판독 영역',localized:'글자 위치 제한 후 RGB',model_input:'기본 모델 입력 · 정규화 전 RGB',fallback:'채택된 보조 판독 영역',fallback_input:'보조 모델 입력 · 정규화 전 RGB'})[k]+' · 재계산',r.patch_url,b,token);
+for(const other of D.frames.filter(v=>r.final_key&&v.final_key===r.final_key)){const button=document.createElement('button'),v=other.observation.fields[field];button.textContent=`${IS_IMAGES?'이미지 #'+(other.sample_index+1):fmt(other.timestamp)+'s'} · ${val(v?.value)} · ${v?.status||'없음'}`;if(other===r)button.className='active-chip';button.onclick=()=>go(other.sample_index);$('peers').append(button)}}
+async function render(){const token=++renderToken,r=selected.get(index);$('time').textContent=IS_IMAGES?`이미지 ${index+1}/${N}`:`${fmt(index/D.plan.fps)}s · #${index}`;$('frameTitle').textContent=r?`${r.observation.name} · ${r.segment}`:'미선택 분석 프레임';$('sourceLink').hidden=!r;if(r)$('sourceLink').href=r.source_url;$('view').disabled=!r?.normalized_url;
+$('notice').textContent=!r?'이 프레임은 인식하지 않았습니다. 전환 감지 영역만 표시할 수 있습니다.':$('view').value==='normalized'?'정렬 전체화면은 JPEG 미리보기입니다. 아래 판독 영역/모델 입력은 무손실 PNG입니다.':'원본 PNG 위의 실제 좌표입니다. ROI 또는 우측 표를 클릭해 근거를 확인하세요.';
+table(r);geometry(r);identity(r);selectionText();timeline();details(r,token);loaded=null;draw();
+try{const url=r?($('view').value==='normalized'&&r.normalized_url?r.normalized_url:r.source_url):`timeline/${String(index).padStart(6,'0')}.jpg`;const im=await load(url);if(token!==renderToken)return;loaded=im;draw()}catch(e){if(token===renderToken)$('notice').textContent=e.message}}
+$('screen').onclick=e=>{const b=$('screen').getBoundingClientRect(),p=[(e.clientX-b.left)/b.width,(e.clientY-b.top)/b.height];const hits=hitRegions.filter(r=>{const xs=r.points.map(p=>p[0]),ys=r.points.map(p=>p[1]);return p[0]>=Math.min(...xs)&&p[0]<=Math.max(...xs)&&p[1]>=Math.min(...ys)&&p[1]<=Math.max(...ys)});if(hits.length){field=hits[0].field;render()}};
+$('timeline').onclick=e=>{stop();$('mode').value='all';const b=$('timeline').getBoundingClientRect();go((e.clientX-b.left)/b.width*(N-1))};
+$('seek').max=N-1;$('seek').oninput=()=>{stop();const xs=list(),requested=Number($('seek').value);go(xs.length?xs.reduce((a,b)=>Math.abs(b-requested)<Math.abs(a-requested)?b:a):index)};
+$('prev').onclick=()=>{stop();step(-1)};$('next').onclick=()=>{stop();step(1)};$('play').onclick=()=>{if(timer!==null){stop();return}$('play').textContent='정지';timer=setTimeout(tick,200)};
+$('mode').onchange=()=>{stop();const xs=list();if(xs.length)go(xs.reduce((a,b)=>Math.abs(b-index)<Math.abs(a-index)?b:a));else $('notice').textContent='해당 조건의 프레임이 없습니다.'};
+for(const id of ['view','fieldsLayer','anchorsLayer','identityLayer','motionLayer','labelsLayer','baselineLayer'])$(id).onchange=()=>render();
+document.addEventListener('keydown',e=>{if(['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName))return;if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();stop();step(e.key==='ArrowRight'?1:-1)}});
+function students(){const q=$('search').value.toLowerCase();$('student').innerHTML='<option value="">학생 바로가기</option>'+Object.entries(D.final).filter(([k,s])=>(s.name+' '+s.student_id).toLowerCase().includes(q)).map(([k,s])=>`<option value="${esc(k)}">${esc(s.name)} (${s.student_id})</option>`).join('')}
+$('search').oninput=students;$('student').onchange=()=>{const r=D.frames.find(r=>r.final_key===$('student').value);if(r){stop();$('mode').value='selected';go(r.sample_index)}};
+$('summary').textContent=IS_IMAGES?`이미지 ${N}장 → ${Object.keys(D.final).length}명 · 중복 제외 ${D.plan.discarded.length}장`:`${D.plan.video.width}×${D.plan.video.height} · ${D.plan.video.duration}s · 분석 ${N}샘플 → ${D.plan.segments.length}구간 / 선택 ${D.frames.length}프레임 → ${Object.keys(D.final).length}명`;
+if(IS_IMAGES){$('mode').querySelector('option[value="all"]').textContent='전체 입력 이미지';document.querySelector('.legend').textContent='이미지 순서축 · 촬영 시간 간격이나 전환량을 추정하지 않습니다.';$('motionLayer').disabled=true;}
+$('provenance').textContent=JSON.stringify(D.provenance,null,2);students();render();
+</script></html>

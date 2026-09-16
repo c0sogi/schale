@@ -1,0 +1,74 @@
+[build-system]
+requires = ["uv_build>=0.11.25,<0.12"]
+build-backend = "uv_build"
+
+[project]
+name = "schale"
+version = "0.1.0"
+description = "SchaleDB-compatible Blue Archive automation toolkit: data, collections, rewards, and vision"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+keywords = ["blue-archive", "schaledb", "automation", "collections", "computer-vision"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Video",
+]
+requires-python = ">=3.12"
+dependencies = ["pydantic>=2.12.5", "requests>=2.32.5", "typer>=0.15.3", "filelock>=3.20.3"]
+
+[project.scripts]
+schale = "schale.cli:app"
+
+[project.urls]
+Repository = "https://github.com/c0sogi/schale"
+Issues = "https://github.com/c0sogi/schale/issues"
+
+[project.optional-dependencies]
+vision = ["opencv-python>=4.10.0", "numpy>=1.26.0"]
+student-ocr = ["opencv-python>=4.10.0", "numpy>=1.26.0", "pillow>=10.0", "onnxruntime>=1.23.2"]
+scanner = [
+    "opencv-python>=4.10.0",
+    "pillow>=10.0",
+    "numpy>=1.26.0",
+    "onnxruntime>=1.23.2",
+]
+
+[dependency-groups]
+test = ["pytest>=9.0.2", "schale[student-ocr]"]
+dev = [
+    { include-group = "test" },
+    "pyright>=1.1.408",
+    "ruff>=0.14.10",
+]
+# Explicit opt-in: never installed by a plain uv sync/run.
+training = [
+    "schale[student-ocr]",
+    "torch>=2.10.0",
+    "torchvision>=0.25.0",
+    "albumentations>=2.0.8",
+    "tqdm>=4.67.1",
+    "onnxscript>=0.5.7",
+]
+
+[tool.uv]
+package = true
+# Note: uv build backend automatically includes all files in src/ layout
+
+[tool.uv.build-backend]
+source-include = ["tests/**", "docs/**", "scripts/**", "CONTRIBUTING.md", "CHANGELOG.md", ".github/workflows/**", "uv.lock"]
+
+[tool.pyright]
+typeCheckingMode = "standard"
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchvision = { index = "pytorch-cpu" }

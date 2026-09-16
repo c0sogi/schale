@@ -1,0 +1,43 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# OMC plugin
+.omc/
+NUL
+
+# Development/debug files
+/test_*.py
+/export_model.py
+debug_*/
+/tier_*.png
+checkpoints/
+training.log
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Test cache
+.pytest_cache/
+
+# Locally installed student model bundles (reinstallable, not source code)
+.schale/
+
+# Private references and learned models are installed in the user cache.
+src/schale/students/data/
+src/schale/scanner/data/
+src/schale/scanner/models/
+*.onnx
+*.onnx.data
+*.pt
+*.pth
+*-vision-resources*.zip
