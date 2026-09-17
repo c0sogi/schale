@@ -3,6 +3,7 @@
 import hashlib
 import json
 from pathlib import Path
+from typing import Callable
 
 from ..cache import Mode, atomic_write, shared_cache
 from ..data_control import get_json
@@ -41,6 +42,7 @@ def load_skill_assets(
     *,
     refresh: bool = False,
     cache_mode: Mode | None = None,
+    progress: Callable[[str], None] | None = None,
 ) -> dict[str, Path]:
     """Cache the actual game symbols; no learned OCR model is used."""
     directory.mkdir(parents=True, exist_ok=True)
@@ -64,4 +66,10 @@ def load_skill_assets(
         )
         return name, resource.path
 
-    return dict(fetch(name) for name in names)
+    result = {}
+    for index, name in enumerate(names, 1):
+        key, path = fetch(name)
+        result[key] = path
+        if progress is not None and (index % 20 == 0 or index == len(names)):
+            progress(f"Skill reference cache: {index}/{len(names)}")
+    return result

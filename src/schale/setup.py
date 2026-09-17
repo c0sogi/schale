@@ -164,14 +164,15 @@ def ensure_student_runtime(
 ) -> None:
     if reader not in {"ctc", "auto", "template"}:
         raise ValueError("Reader must be auto, ctc, or template")
-    report = runtime_report(numeric_model)
-    if not report["references"]["valid"] or (
-        reader == "ctc" and not report["model"]["valid"] and numeric_model is None
-    ):
+    if find_setup(sources) is not None:
         prepare_local_setup(sources)
-        report = runtime_report(numeric_model)
+    if reader in {"ctc", "auto"} and numeric_model is None:
+        from .students.download import ensure_numeric_model
+
+        ensure_numeric_model()
+    report = runtime_report(numeric_model)
     missing = []
-    if not report["references"]["valid"]:
+    if reader == "template" and not report["references"]["valid"]:
         missing.append("student UI references")
     if reader == "ctc" and not report["model"]["valid"]:
         missing.append(f"numeric model ({report['model']['path']})")
@@ -189,7 +190,9 @@ def ensure_student_runtime(
         path.is_file() and path.suffix.lower() not in image_suffixes for path in sources
     )
     tools = (
-        [name for name, path in report["tools"].items() if not path] if video else []
+        [name for name, path in report["tools"].items() if not path]
+        if video and importlib.util.find_spec("av") is None
+        else []
     )
     if missing or tools:
         lines = ["First-run setup is incomplete (all missing requirements are listed):"]
@@ -218,7 +221,7 @@ def ensure_student_runtime(
 
 def run_with_vision_if_needed(arguments: list[str]) -> int | None:
     """Use uv's isolated tool environment, never pip-install into the caller's project."""
-    required = ("cv2", "numpy", "PIL", "onnxruntime")
+    required = ("cv2", "numpy", "PIL", "onnxruntime", "av")
     if all(importlib.util.find_spec(name) is not None for name in required):
         return None
     uv = shutil.which("uv")

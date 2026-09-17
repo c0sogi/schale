@@ -124,7 +124,16 @@ def replay_video(plan: dict, source: Path, output: Path, progress: Callable) -> 
         "-",
     ]
     signatures = []
-    for index, image in enumerate(frames(command, 640, 360)):
+    if plan["decoder"] and plan["decoder"][0] == "pyav":
+        from .video_native import sampled_frames
+
+        images = (
+            cv2.resize(frame.to_ndarray(format="bgr24"), (640, 360))
+            for _, frame in sampled_frames(source, fps)
+        )
+    else:
+        images = frames(command, 640, 360)
+    for index, image in enumerate(images):
         signatures.append(signature(image))
         save_image(output / "timeline" / f"{index:06}.jpg", image)
         if index % 300 == 0:
@@ -227,7 +236,19 @@ def build_inspector(
             record["timeline_alignment_mae"] = alignment_mae
             if layout_info:
                 if matcher is None:
-                    matcher = LayoutMatcher()
+                    if layout_info["right"].get("method", "").startswith("input-"):
+                        from .geometry import BootstrapLayoutMatcher
+
+                        matcher = BootstrapLayoutMatcher()
+                    elif (
+                        layout_info["right"].get("method")
+                        == "geometric-edge-registration"
+                    ):
+                        from .geometry import GeometryMatcher
+
+                        matcher = GeometryMatcher()
+                    else:
+                        matcher = LayoutMatcher()
                 layout = Layout(
                     {k: np.array(v["matrix"]) for k, v in layout_info.items()},
                     layout_info,
@@ -276,7 +297,9 @@ def build_inspector(
                 replayed = matcher.locate(original)
                 if replayed is not None:
                     for side, info in replayed.diagnostics.items():
-                        reference = np.asarray(info["reference_points"])
+                        reference = np.asarray(
+                            info.get("reference_points", [[25, 550], [620, 700]])
+                        )
                         a, b = layout.matrices[side], replayed.matrices[side]
                         delta = float(
                             np.max(
@@ -430,7 +453,7 @@ def draw_preview(report: dict, extraction: Path, destination: Path) -> None:
             cv2.LINE_AA,
         )
     for info in selected["anchors"].values():
-        for point in info["source_points"]:
+        for point in info.get("source_points", []):
             p = np.rint(np.asarray(point) * 1.25 + (0, 70)).astype(int)
             cv2.circle(canvas, tuple(p), 2, (255, 220, 80), -1)
     uncertain = [

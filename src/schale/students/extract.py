@@ -104,8 +104,11 @@ def extract(
     if reader not in {"auto", "ctc", "template"}:
         raise ValueError("Reader must be auto, ctc, or template")
     from .numeric import NumericReader
+    from .download import ensure_numeric_model
 
     model_path = model_directory(numeric_model)
+    if reader in {"ctc", "auto"} and numeric_model is None:
+        model_path = ensure_numeric_model()
     numeric = None
     if reader != "template" and (numeric_model is not None or model_path.exists()):
         numeric = NumericReader(model_path)
@@ -113,7 +116,12 @@ def extract(
         raise ValueError(
             f"CTC model not installed at {model_path}; run 'schale students install-model MODEL.zip' or pass --numeric-model"
         )
-    references = resolve_resources("students")
+    try:
+        references = resolve_resources("students")
+    except ValueError:
+        if numeric is None:
+            raise
+        references = None
     progress(
         f"Numeric reader: {numeric.method if numeric is not None else 'NCC templates (no CTC model selected)'}"
     )
@@ -138,11 +146,12 @@ def extract(
     plan_file.write_text(json.dumps(plan, indent=2), encoding="utf-8")
     catalog, digest = load_catalog(output / "students.json")
     progress("Loading game-symbol references...")
-    assets = load_skill_assets(catalog, cache / "skills")
+    assets = load_skill_assets(catalog, cache / "skills", progress=progress)
     vision = Vision(
         IdentityMatcher(catalog, assets, cache / "portraits"),
         data=references,
         numeric=numeric,
+        reference_free=references is None,
     )
     observations = output / "observations"
     observations.mkdir(exist_ok=True)
@@ -159,10 +168,13 @@ def extract(
             "numeric.py",
             "model_bundle.py",
             "layout.py",
+            "geometry.py",
         )
     )
-    templates = b"".join(
-        p.read_bytes() for p in sorted(references.iterdir()) if p.is_file()
+    templates = (
+        b"".join(p.read_bytes() for p in sorted(references.iterdir()) if p.is_file())
+        if references is not None
+        else b"reference-free-geometry-v1"
     )
     revision = hashlib.sha256(
         code
@@ -173,7 +185,11 @@ def extract(
     identity_revision = hashlib.sha256(
         (module / "identity.py").read_bytes()
         + (module / "layout.py").read_bytes()
-        + (references / "layout_reference.npz").read_bytes()
+        + (
+            (references / "layout_reference.npz").read_bytes()
+            if references is not None
+            else (module / "geometry.py").read_bytes()
+        )
         + digest.encode()
     ).hexdigest()
     visits = []

@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "schale"
-version = "0.1.1"
+version = "0.1.2"
 description = "SchaleDB-compatible Blue Archive automation toolkit: data, collections, rewards, and vision"
 readme = "README.md"
 license = "MIT"
@@ -28,10 +28,16 @@ Repository = "https://github.com/c0sogi/schale"
 Issues = "https://github.com/c0sogi/schale/issues"
 
 [project.optional-dependencies]
-vision = ["opencv-python>=4.10.0", "numpy>=1.26.0"]
-student-ocr = ["opencv-python>=4.10.0", "numpy>=1.26.0", "pillow>=10.0", "onnxruntime>=1.23.2"]
+vision = ["opencv-python>=4.10.0,<5", "numpy>=1.26.0"]
+student-ocr = [
+    "opencv-python>=4.10.0,<5",
+    "numpy>=1.26.0",
+    "pillow>=10.0",
+    "onnxruntime>=1.23.2",
+    "av>=16.0.0",
+]
 scanner = [
-    "opencv-python>=4.10.0",
+    "opencv-python>=4.10.0,<5",
     "pillow>=10.0",
     "numpy>=1.26.0",
     "onnxruntime>=1.23.2",

@@ -4,23 +4,20 @@
 
 ## 설치와 실행
 
-Python 3.12+, `uv`, 영상용 `ffmpeg`/`ffprobe`가 필요합니다. 기준 데이터와 스킬 이미지는 공유 HTTP 캐시를 재사용하고, 없는 항목만 받습니다. 초상화는 식별이 모호할 때 후보만 필요에 따라 받습니다. 자동 재검증·오프라인 정책은 [캐시 안내](cache.md)를 따릅니다.
+Python 3.12+와 `uv`가 필요합니다. 숫자 모델·비전 런타임은 첫 실행에 자동 준비하며 외부 FFmpeg 설치는 필수가 아닙니다. 기준 데이터와 스킬 이미지는 공유 HTTP 캐시를 재사용하고, 없는 항목만 받습니다. 초상화는 식별이 모호할 때 후보만 필요에 따라 받습니다. 자동 재검증·오프라인 정책은 [캐시 안내](cache.md)를 따릅니다.
 
-학생 UI 참조와 문자 모델은 패키지에 포함하지 않습니다. [로컬 자원 구성](assets.md)에
-따라 자신의 참조 번들과 문자 모델을 준비한 다음 설치합니다.
+학생 추출에는 개인 ZIP이나 게임 UI 참조 파일이 필요하지 않습니다.
+패널·버튼의 기하 정합과 공개 ONNX 숫자 모델을 사용합니다.
 
 ```powershell
-uv tool install "schale[student-ocr]==0.1.0"
-schale assets install ".\my-vision-resources.zip"
-schale students install-model ".\schale-student-numeric-v1.zip"
-schale students doctor
+uv tool install schale
 schale students extract "C:\path\recording.mp4" --output "C:\path\result"
 schale students inspect "C:\path\result" --output "C:\path\result\inspector"
 ```
 
-`doctor`는 의존성, FFmpeg 경로, 모델·참조 파일 해시, 캐시 경로를 검사하며 준비가 안 되어 있으면 종료 코드 1을 반환합니다. FFmpeg/FFprobe는 OS에 맞게 별도로 설치하고 PATH에 추가하세요. Windows + Python 3.12에서 실제 영상 처리까지 검증하며, 다른 OS의 실제 영상 처리는 별도 검증이 필요합니다.
+`doctor`는 의존성, 선택적 FFmpeg 경로, 모델 무결성, 정합 방식과 캐시 경로를 읽기 전용으로 검사합니다. 최초 추출 전 모델이 아직 없으면 준비 전 상태로 보고하며, 추출 명령이 이를 자동 준비합니다.
 
-Python 프로젝트에서는 `uv add "schale[student-ocr]==0.1.0"`로 설치합니다. 소스 저장소에서는 `uv run --no-dev --extra student-ocr schale ...`을 사용하면 학습 패키지를 설치하지 않습니다. 기본 설치는 데이터·계정·보상·자원 관리 기능을 제공하며, 학생 비전은 `student-ocr`, 템플릿 전용 실행은 `vision`, 인벤토리 스캐너는 `scanner` extra를 사용합니다.
+Python 프로젝트에서는 `uv add "schale[student-ocr]"`로 설치합니다. 소스 저장소에서는 `uv run --no-dev --extra student-ocr schale ...`을 사용하면 학습 패키지를 설치하지 않습니다. 기본 설치는 데이터·계정·보상·자원 관리 기능을 제공하며, 학생 비전은 `student-ocr`, 템플릿 전용 실행은 `vision`, 인벤토리 스캐너는 `scanner` extra를 사용합니다.
 
 모델·학생 이미지의 기본 캐시는 사용자 홈의 `.schale/cache/`입니다. 기존 데이터 조회의 `SCHALE_CACHE_DIR` 환경변수로 함께 변경할 수 있습니다. 학생 DB 스냅샷은 재현성을 위해 각 추출 결과에도 저장합니다.
 
@@ -38,7 +35,7 @@ Python 프로젝트에서는 `uv add "schale[student-ocr]==0.1.0"`로 설치합�
 
 모델 번들은 `model.onnx`, `metadata.json`, `LICENSE-OpenOCR`, `NOTICE.md`로 구성하며 폴더 또는 평평한 ZIP 구조를 받습니다. `install-model`은 임시 경로에서 SHA-256과 UI 프로파일을 검증한 뒤 설치하며 기존 모델을 덮어쓰지 않습니다. 신뢰할 수 있는 출처의 번들만 설치하세요. 메타데이터와의 해시 일치는 파일 손상 검사이지 배포자의 서명 검증은 아닙니다.
 
-**기본 판독기는 `ctc`입니다.** 모델이 없으면 설치 방법을 안내하고 중단합니다. 모델 없는 템플릿 실행은 `--reader template`, 이전의 자동 선택 동작은 명시적인 `--reader auto`로 사용할 수 있습니다. 손상된 모델은 템플릿으로 대체하지 않습니다.
+**기본 판독기는 `ctc`입니다.** 공개 모델이 없으면 자동으로 받아 무결성을 확인합니다. `--reader auto`도 같은 모델 준비 경로를 사용합니다. 명시한 `--numeric-model` 경로는 자동으로 대체하지 않습니다. `--reader template`은 기존 개인 템플릿을 사용하려는 고급 실행 방식입니다.
 
 Python API는 `from schale.students.extract import extract`, 감독 보고서는 `from schale.students.inspector import build_inspector`로 사용하며 경로 인수는 `pathlib.Path`입니다. 원본 패키지의 `StageRewards` 등 기존 공개 API도 유지합니다.
 

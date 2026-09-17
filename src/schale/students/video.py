@@ -175,6 +175,10 @@ def selection_plan(signatures, fps: int = 30):
 
 
 def prepare_video(video: Path, output: Path, fps: int = 30):
+    if not all(shutil.which(name) for name in ("ffmpeg", "ffprobe")):
+        from .video_native import prepare_native
+
+        return prepare_native(video, output, fps)
     info = probe(video)
     if abs(info["width"] / info["height"] - 16 / 9) > 0.03:
         raise ValueError(

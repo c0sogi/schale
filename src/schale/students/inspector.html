@@ -59,7 +59,7 @@ if(isField&&$('baselineLayer').checked&&!canonical)overlay(ctx,rect(region.box),
 const text=$('labelsLayer').checked?(isField?`${names[region.name]||region.name} ${val(reading?.value)}`:region.name):'';
 overlay(ctx,points,color,text,false,region.name===field?4:2);if(isField)hitRegions.push({field:region.name,points});}
 if(!canonical&&r.observation.fields[field])for(const e of r.observation.fields[field].evidence)overlay(ctx,rect(e.roi),'#ffffff','근거 ROI',true,3);
-if($('anchorsLayer').checked)for(const info of Object.values(r.anchors)){const points=canonical?info.reference_points:info.source_points;ctx.fillStyle='#68d8ff';for(const p of points){ctx.beginPath();ctx.arc(p[0]*1.5,p[1]*1.5,2.8,0,7);ctx.fill()}}
+if($('anchorsLayer').checked)for(const info of Object.values(r.anchors)){const points=(canonical?info.reference_points:info.source_points)||[];ctx.fillStyle='#68d8ff';for(const p of points){ctx.beginPath();ctx.arc(p[0]*1.5,p[1]*1.5,2.8,0,7);ctx.fill()}}
 }
 function timeline(){if(IS_IMAGES){const c=$('timeline'),ctx=c.getContext('2d'),w=c.width,h=c.height;ctx.clearRect(0,0,w,h);ctx.fillStyle='#0b1521';ctx.fillRect(0,0,w,h);for(let i=0;i<N;i++){const x=i/Math.max(1,N-1)*(w-20)+10;ctx.fillStyle=i===index?'#fff':'#68aaff';ctx.fillRect(x-2,20,4,h-40);if(N<30)ctx.fillText('#'+(i+1),x,h-5)}return}const c=$('timeline'),ctx=c.getContext('2d'),w=c.width,h=c.height;ctx.clearRect(0,0,w,h);ctx.fillStyle='#0b1521';ctx.fillRect(0,0,w,h);const max=Math.max(D.plan.threshold*3,...D.motion),x=i=>i/(N-1)*w,y=v=>h-26-v/max*(h-44);
 for(const s of D.plan.discarded){ctx.fillStyle='#a12d4866';ctx.fillRect(s.start*D.plan.fps/(N-1)*w,0,(s.end-s.start)*D.plan.fps/(N-1)*w,h)}

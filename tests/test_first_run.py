@@ -103,19 +103,20 @@ def test_output_dot_preserves_home_files(tmp_path, monkeypatch):
         select_output([source], Path("."), True)
 
 
-def test_missing_resources_reported_together_without_creating_output(
+def test_offline_missing_model_reports_online_requirement_without_private_setup(
     tmp_path, monkeypatch
 ):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("SCHALE_CACHE_DIR", str(tmp_path / "cache"))
+    monkeypatch.setenv("SCHALE_OFFLINE", "1")
     monkeypatch.setattr(Path, "home", lambda: tmp_path / "new-user")
     source = tmp_path / "capture.png"
     source.write_bytes(b"fixture")
     result = CliRunner().invoke(app, ["students", "extract", str(source)])
     assert result.exit_code == 1
-    assert "student UI references" in result.output
-    assert "numeric model" in result.output
-    assert "schale-setup.zip" in result.output
+    assert "Numeric model is not cached" in result.output
+    assert "automatic downloads are disabled" in result.output
+    assert "schale-setup.zip" not in result.output
     assert "MODEL.zip" not in result.output
     assert not (tmp_path / "capture-schale").exists()
 
@@ -188,3 +189,20 @@ def test_output_file_is_rejected(tmp_path):
     with pytest.raises(ValueError, match="Output is a file"):
         select_output([tmp_path / "video.mp4"], file, False)
     assert file.read_text() == "keep"
+
+
+@pytest.mark.parametrize("status", [0, 2])
+def test_isolated_runtime_preserves_child_exit_status(tmp_path, monkeypatch, status):
+    import schale.setup as module
+
+    source = tmp_path / "video.mp4"
+    source.write_bytes(b"child handles actual decoding")
+    monkeypatch.setattr(module, "run_with_vision_if_needed", lambda _: status)
+    monkeypatch.setattr(
+        module,
+        "ensure_student_runtime",
+        lambda *_args, **_kwargs: pytest.fail("child already handled extraction"),
+    )
+    result = CliRunner().invoke(app, ["students", "extract", str(source)])
+    assert result.exit_code == status
+    assert "Extraction failed" not in result.output

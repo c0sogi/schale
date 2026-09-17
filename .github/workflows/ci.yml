@@ -6,7 +6,7 @@ jobs:
   test:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         python: ['3.12', '3.13']
     runs-on: ${{ matrix.os }}
     env:
@@ -17,7 +17,8 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: uv sync --locked --no-default-groups --group test
-      - run: uv run --no-default-groups --group test pytest tests/test_first_run.py tests/test_assets.py tests/test_inventory_onnx.py tests/test_dependency_policy.py tests/test_http_cache.py tests/test_inputs.py tests/test_toolkit.py tests/test_students.py tests/test_students_numeric.py tests/test_students_layout.py tests/test_students_inspector.py tests/test_distribution.py -q
+      - run: uv run --no-default-groups --group test pytest tests/test_public_runtime.py tests/test_first_run.py tests/test_assets.py tests/test_inventory_onnx.py tests/test_dependency_policy.py tests/test_http_cache.py tests/test_inputs.py tests/test_toolkit.py tests/test_students.py tests/test_students_numeric.py tests/test_students_layout.py tests/test_students_inspector.py tests/test_distribution.py -q
+      - run: uv run --no-default-groups --group test python scripts/check_public_bootstrap.py
       - run: uv build --no-sources
-      - run: uv run --no-default-groups python scripts/check_distribution.py dist/schale-0.1.1-py3-none-any.whl dist/schale-0.1.1.tar.gz
-      - run: uvx twine check --strict dist/schale-0.1.1-py3-none-any.whl dist/schale-0.1.1.tar.gz
+      - run: uv run --no-default-groups python scripts/check_distribution.py dist/schale-0.1.2-py3-none-any.whl dist/schale-0.1.2.tar.gz
+      - run: uvx twine check --strict dist/schale-0.1.2-py3-none-any.whl dist/schale-0.1.2.tar.gz

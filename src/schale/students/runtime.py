@@ -18,6 +18,7 @@ def runtime_report(model: Path | None = None) -> dict:
         ("numpy", "numpy"),
         ("pillow", "PIL"),
         ("onnxruntime", "onnxruntime"),
+        ("av", "av"),
     ):
         try:
             installed = (
@@ -40,10 +41,9 @@ def runtime_report(model: Path | None = None) -> dict:
         "model": {"path": str(model_path), **model_status},
         "assets": str(asset_directory()),
         "references": references,
+        "registration": "sift" if references["valid"] else "geometric-edge-registration",
         "packages": packages,
         "tools": tools,
         "ready": all(packages.values())
-        and all(tools.values())
-        and model_status["valid"]
-        and references["valid"],
+        and model_status["valid"],
     }

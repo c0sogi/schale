@@ -77,6 +77,37 @@ class Layout:
 
 
 class LayoutMatcher:
+    @classmethod
+    def from_input(cls, original, layout: Layout):
+        """Build transient static-UI anchors from this input, never a shipped capture."""
+        matcher = cls.__new__(cls)
+        matcher.reference = {}
+        matcher.sift = cv2.SIFT.create(nfeatures=5000, contrastThreshold=0.025)
+        matcher.matcher = cv2.BFMatcher(cv2.NORM_L2)
+        canonical = cv2.resize(layout.normalize(original), REFERENCE_SIZE)
+        gray = cv2.cvtColor(canonical, cv2.COLOR_BGR2GRAY)
+        regions = {
+            "left": [(425, 645, 622, 704)],
+            "right": [
+                (660, 115, 1216, 217),
+                (1110, 310, 1200, 425),
+                (1110, 450, 1200, 535),
+                (1100, 555, 1200, 640),
+            ],
+        }
+        for side, boxes in regions.items():
+            mask = np.zeros(gray.shape, np.uint8)
+            for x0, y0, x1, y1 in boxes:
+                mask[y0:y1, x0:x1] = 255
+            points, descriptors = matcher.sift.detectAndCompute(gray, mask)
+            if descriptors is None or len(points) < 12:
+                return None
+            matcher.reference[side + "_points"] = np.array(
+                [p.pt for p in points], np.float32
+            )
+            matcher.reference[side + "_descriptors"] = descriptors
+        return matcher
+
     def __init__(self, data: Path | None = None):
         from ..assets import resolve_resources
 

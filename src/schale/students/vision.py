@@ -53,12 +53,29 @@ def match_patch(image, box, template) -> float:
 
 class Vision:
     def __init__(
-        self, identity: IdentityMatcher, data: Path | None = None, numeric=None
+        self,
+        identity: IdentityMatcher,
+        data: Path | None = None,
+        numeric=None,
+        *,
+        reference_free: bool = False,
     ):
-        data = data if data is not None else resolve_resources("students")
         self.identity = identity
-        self.labels = LabelBank(data)
         self.numeric = numeric
+        if reference_free:
+            from .geometry import BootstrapLayoutMatcher
+
+            if numeric is None:
+                raise ValueError("Reference-free recognition requires a numeric reader")
+            self.labels = None
+            self.layout = BootstrapLayoutMatcher()
+            self.header = None
+            self.empty_gear = None
+            self.ghost_templates = []
+            self.potential_templates = {}
+            return
+        data = data if data is not None else resolve_resources("students")
+        self.labels = LabelBank(data)
         self.layout = LayoutMatcher(data / "layout_reference.npz")
         self.header = read_image(data / "header.png")
         self.empty_gear = read_image(data / "empty_gear.png")
@@ -111,7 +128,7 @@ class Vision:
                 evidence=[evidence(box, raw, score, "visual-state")],
             )
 
-        if match_patch(image, HEADER, self.header) < 0.85:
+        if self.header is not None and match_patch(image, HEADER, self.header) < 0.85:
             row.identity_status = "not_student_screen"
             return row
         student_id, candidates, method = identity_hint or self.identity.identify(image)
@@ -139,6 +156,8 @@ class Vision:
                 numeric[field]
                 if self.numeric is not None
                 else self.labels.read(image, field)
+                if self.labels is not None
+                else (None, 0.0, "no reader")
             )
             row.fields[field] = Reading(
                 value=value,
@@ -154,7 +173,7 @@ class Vision:
                     )
                 ],
             )
-            if self.numeric is not None:
+            if self.numeric is not None and self.labels is not None:
                 alternate, alternate_score, alternate_raw = self.labels.read(
                     image, field
                 )
@@ -273,7 +292,20 @@ class Vision:
                 row.fields[f"equipment{i}_level"].value = None
                 row.fields[f"equipment{i}_level"].status = "unknown"
         if row.fields["gear"].value is None:
-            score = match_patch(image, EMPTY_GEAR, self.empty_gear)
+            score = (
+                match_patch(image, EMPTY_GEAR, self.empty_gear)
+                if self.empty_gear is not None
+                else 0.0
+            )
+            if self.empty_gear is None and self.numeric is not None:
+                label = self.numeric.read([crop(image, EMPTY_GEAR)])[0]
+                if (
+                    label.text.strip().upper() == "EMPTY"
+                    and label.score >= self.numeric.threshold
+                ):
+                    visual(
+                        "gear", 0, EMPTY_GEAR, "EMPTY text", label.score, inferred=True
+                    )
             if score > 0.90:
                 visual(
                     "gear", 0, EMPTY_GEAR, "EMPTY slot template", score, inferred=True

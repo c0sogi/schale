@@ -61,7 +61,6 @@ def students_extract(
         from schale.setup import run_with_vision_if_needed
 
         output = select_output(source, output, resume)
-        ensure_student_runtime(source, reader=reader, numeric_model=numeric_model)
         arguments = [
             "students",
             "extract",
@@ -80,6 +79,7 @@ def students_extract(
         child_status = run_with_vision_if_needed(arguments)
         if child_status is not None:
             raise typer.Exit(child_status)
+        ensure_student_runtime(source, reader=reader, numeric_model=numeric_model)
         from schale.students.extract import extract
 
         typer.echo(f"Output: {output}")
@@ -92,6 +92,8 @@ def students_extract(
             numeric_model=numeric_model,
             progress=lambda message: print(message, flush=True),
         )
+    except typer.Exit:
+        raise
     except ImportError as error:
         typer.echo(
             "Student extraction dependencies missing; install 'schale[student-ocr]' (or 'schale[vision]' for --reader template).",

@@ -127,17 +127,20 @@ def test_working_directory_does_not_change_default_cache(tmp_path, monkeypatch):
     assert asset_directory() == tmp_path / "shared/assets"
 
 
-def test_missing_model_does_not_download_or_create_output(tmp_path, monkeypatch):
+def test_offline_missing_model_does_not_download_or_create_output(
+    tmp_path, monkeypatch
+):
     import schale.students.extract as module
 
     monkeypatch.setenv("SCHALE_CACHE_DIR", str(tmp_path / "cache"))
+    monkeypatch.setenv("SCHALE_OFFLINE", "1")
     monkeypatch.setattr(
         module, "load_catalog", lambda *args: pytest.fail("should not download")
     )
     source = tmp_path / "video.mp4"
     source.write_bytes(b"no decoding needed")
     output = tmp_path / "output"
-    with pytest.raises(ValueError, match="CTC model not installed"):
+    with pytest.raises(ValueError, match="automatic downloads are disabled"):
         module.extract(source, output)
     assert not output.exists()
 

@@ -56,9 +56,69 @@ def parse(text: str, field: str) -> int | None:
     return value if value <= maximum else None
 
 
+def bond_cell(patch):
+    """Keep complete numeral strokes inside the heart, excluding its dark surround."""
+    hsv = cv2.cvtColor(patch, cv2.COLOR_BGR2HSV)
+    pink = (
+        (hsv[:, :, 0] > 140)
+        & (hsv[:, :, 0] < 179)
+        & (hsv[:, :, 1] > 30)
+        & (hsv[:, :, 2] > 170)
+    ).astype(np.uint8)
+    contours, _ = cv2.findContours(pink, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        return patch
+    heart = max(contours, key=cv2.contourArea)
+    if cv2.contourArea(heart) < patch.shape[0] * patch.shape[1] * 0.15:
+        return patch
+    interior = np.zeros(pink.shape, np.uint8)
+    cv2.drawContours(interior, [heart], -1, 255, -1)
+    interior = cv2.erode(interior, np.ones((3, 3), np.uint8))
+    ink = ((hsv[:, :, 2] < 150) & (hsv[:, :, 1] < 170) & (interior > 0)).astype(
+        np.uint8
+    )
+    _, labels, stats, _ = cv2.connectedComponentsWithStats(ink)
+    keep = [
+        i
+        for i, part in enumerate(stats[1:], 1)
+        if part[3] >= patch.shape[0] * 0.25 and part[4] >= 12
+    ]
+    if not keep:
+        return patch
+    mask = np.isin(labels, keep)
+    yy, xx = np.nonzero(mask)
+    cell = (
+        255
+        - mask[yy.min() : yy.max() + 1, xx.min() : xx.max() + 1].astype(np.uint8) * 255
+    )
+    cell = cv2.copyMakeBorder(cell, 5, 5, 5, 5, cv2.BORDER_CONSTANT, value=255)
+    return cv2.cvtColor(cell, cv2.COLOR_GRAY2BGR)
+
+
 def localize(patch, field: str):
     """Locate the text but retain RGB texture and outlines for recognition."""
     kind = family(field)
+    if field == "bond":
+        return bond_cell(patch)
+    if field.startswith("potential_"):
+        # Detect the enclosing badge, not separate yellow glyph components:
+        # a compressed last digit can otherwise disappear from the crop.
+        hsv = cv2.cvtColor(patch, cv2.COLOR_BGR2HSV)
+        blue = cv2.inRange(hsv, np.array((90, 110, 70)), np.array((125, 255, 255)))
+        contours, _ = cv2.findContours(blue, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            return patch
+        x, y, w, h = cv2.boundingRect(max(contours, key=cv2.contourArea))
+        yellow = (
+            (hsv[:, :, 0] >= 15)
+            & (hsv[:, :, 0] <= 40)
+            & (hsv[:, :, 1] > 100)
+            & (hsv[:, :, 2] > 130)
+        )
+        rows = np.flatnonzero(yellow[:, x : x + w].sum(axis=1) >= 3)
+        if len(rows):
+            y, h = int(rows[0]), int(rows[-1] - rows[0] + 1)
+        return patch[max(0, y - 3) : y + h + 3, max(0, x - 3) : x + w + 3].copy()
     if field == "weapon_level" or field.endswith("_level"):
         return patch
     hsv = cv2.cvtColor(patch, cv2.COLOR_BGR2HSV)
